@@ -1,0 +1,3351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>塔防 · 关卡模式</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+
+  html, body {
+    background: radial-gradient(circle at 50% 0%, #16213a 0%, #070b14 70%);
+    min-height: 100vh;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #e2e8f0;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  body {
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .hidden { display: none !important; }
+
+  /* ============ 主菜单 ============ */
+  .menu-screen { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 12px; animation: fadeIn .35s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .menu-header { text-align: center; padding: 8px 0 2px; }
+  .menu-header h1 {
+    font-size: 28px; letter-spacing: 2px;
+    background: linear-gradient(180deg, #5eead4, #22d3ee 60%, #818cf8);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 40px rgba(34,211,238,.25); margin-bottom: 6px;
+  }
+  .menu-header p { color: #93a5c4; font-size: 13px; letter-spacing: 1px; }
+  .level-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .level-card {
+    position: relative; display: flex; flex-direction: column; gap: 6px;
+    padding: 14px 16px; background: linear-gradient(180deg, #1a2438, #111a2b);
+    border: 1px solid #2c3c5a; border-radius: 12px; cursor: pointer;
+    transition: all .16s ease; text-align: left; color: #cbd5e1;
+    font-family: inherit; overflow: hidden;
+  }
+  .level-card:active:not(.locked) { transform: scale(.985); border-color: #4b6a9c; }
+  .level-card.locked { cursor: not-allowed; opacity: .5; }
+  .level-card.locked::after { content: '🔒'; position: absolute; right: 14px; top: 14px; font-size: 18px; opacity: .8; }
+  .lc-num { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #64748b; text-transform: uppercase; }
+  .lc-name { font-size: 17px; font-weight: 800; color: #e2e8f0; letter-spacing: .5px; }
+  .lc-desc { font-size: 12px; color: #7f92b0; line-height: 1.45; }
+  .lc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+  .lc-stars { font-size: 12px; color: #fbbf24; letter-spacing: 2px; }
+  .lc-unlock {
+    font-size: 10px; color: #5eead4; background: rgba(94,234,212,.08);
+    border: 1px solid rgba(94,234,212,.25); border-radius: 6px;
+    padding: 3px 8px; display: inline-block; font-weight: 700;
+  }
+  .lc-unlock.done { color: #64748b; background: rgba(100,116,139,.08); border-color: rgba(100,116,139,.2); }
+  .menu-footer { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 6px 0 10px; flex-wrap: wrap; }
+  .btn-ghost {
+    padding: 10px 18px; font-size: 13px; font-weight: 700; color: #94a3b8;
+    background: transparent; border: 1px solid #33486d; border-radius: 9px;
+    cursor: pointer; transition: all .14s; font-family: inherit;
+  }
+  .btn-ghost:active { color: #f87171; border-color: #7f1d1d; background: rgba(127,29,29,.15); }
+  .btn-primary {
+    padding: 10px 18px; font-size: 13px; font-weight: 800; border: none;
+    border-radius: 9px; cursor: pointer; font-family: inherit;
+    transition: transform .14s, filter .14s;
+  }
+  .btn-primary:active { transform: scale(.96); filter: brightness(1.08); }
+  .btn-primary.gold { color: #1a0e00; background: linear-gradient(180deg, #fbbf24, #f59e0b); box-shadow: 0 0 16px rgba(251,191,36,.25); }
+  .btn-primary.purple { color: #fff; background: linear-gradient(180deg, #a78bfa, #818cf8); box-shadow: 0 0 16px rgba(167,139,250,.25); }
+
+  /* ============ 无尽/模式页面 ============ */
+  .endless-screen, .modes-screen {
+    width: 100%; max-width: 560px; display: flex; flex-direction: column;
+    gap: 14px; animation: fadeIn .35s ease;
+  }
+  .endless-header, .modes-header { text-align: center; padding: 8px 0 2px; }
+  .endless-header h1 {
+    font-size: 30px; letter-spacing: 3px;
+    background: linear-gradient(180deg, #fbbf24, #f97316 60%, #ef4444);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 40px rgba(251,191,36,.35); margin-bottom: 6px;
+  }
+  .endless-header p, .modes-header p { color: #93a5c4; font-size: 13px; letter-spacing: 1px; }
+  .modes-header h1 {
+    font-size: 26px; letter-spacing: 2px;
+    background: linear-gradient(180deg, #a78bfa, #818cf8 60%, #6366f1);
+    -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 6px;
+  }
+
+  .endless-record {
+    padding: 18px 20px; background: linear-gradient(180deg, #2a1e10, #1a1208);
+    border: 1px solid #5c4a1e; border-radius: 14px;
+    box-shadow: 0 0 24px rgba(251,191,36,.15), inset 0 1px 0 rgba(251,191,36,.1);
+  }
+  .er-title { font-size: 11px; font-weight: 800; color: #fbbf24; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 14px; text-align: center; }
+  .er-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .er-stat {
+    text-align: center; padding: 12px 8px; background: rgba(0,0,0,.28);
+    border-radius: 10px; border: 1px solid rgba(251,191,36,.15);
+  }
+  .er-stat .label { display: block; font-size: 11px; color: #b6a06c; font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; }
+  .er-stat .value {
+    display: block; font-size: 26px; font-weight: 900; color: #fbbf24;
+    font-family: 'Courier New', monospace; letter-spacing: 1px;
+    text-shadow: 0 0 14px rgba(251,191,36,.6); line-height: 1.1; word-break: break-all;
+  }
+  .er-stat .value.small { font-size: 18px; }
+  .er-empty { text-align: center; color: #8a7550; font-size: 13px; padding: 8px 0; letter-spacing: .5px; }
+
+  .endless-actions { display: flex; flex-direction: column; gap: 10px; }
+  .endless-action-btn {
+    display: flex; align-items: center; gap: 12px; padding: 16px 18px;
+    background: linear-gradient(180deg, #1a2438, #111a2b);
+    border: 1px solid #2c3c5a; border-radius: 12px;
+    text-align: left; color: #cbd5e1; font-family: inherit;
+    cursor: pointer; transition: all .16s ease;
+  }
+  .endless-action-btn:active { transform: scale(.985); border-color: #4b6a9c; }
+  .endless-action-btn.primary {
+    background: linear-gradient(180deg, #3a2a08, #1f1504);
+    border-color: #7f5f1d; box-shadow: 0 0 20px rgba(251,191,36,.2);
+  }
+  .endless-action-btn.primary:active { border-color: #fbbf24; }
+  .endless-action-btn.danger:active { border-color: #dc2626; }
+  .ea-icon { font-size: 24px; line-height: 1; flex-shrink: 0; }
+  .ea-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .ea-info b { font-size: 15px; color: #e2e8f0; letter-spacing: .3px; }
+  .ea-info small { font-size: 12px; color: #7f92b0; line-height: 1.4; }
+  .endless-action-btn.danger .ea-info b { color: #fca5a5; }
+
+  /* ============ 更多模式 ============ */
+  .mode-list { display: flex; flex-direction: column; gap: 10px; }
+  .mode-card {
+    display: flex; align-items: center; gap: 12px; padding: 16px 18px;
+    background: linear-gradient(180deg, #1a2438, #111a2b);
+    border: 1px solid #2c3c5a; border-radius: 12px;
+    text-align: left; font-family: inherit; color: #cbd5e1;
+    cursor: pointer; transition: all .16s ease;
+  }
+  .mode-card:active { transform: scale(.985); }
+  .mode-card.limit:active { border-color: #f87171; }
+  .mode-card.random:active { border-color: #a78bfa; }
+  .mode-card.defense:active { border-color: #94a3b8; }
+  .mode-card.op:active { border-color: #fbbf24; }
+  .mode-card.op {
+    background: linear-gradient(180deg, #3a2a08, #1f1504);
+    border-color: #7f5f1d;
+    box-shadow: 0 0 16px rgba(251,191,36,.15);
+  }
+  .mode-card.locked { opacity: .55; cursor: not-allowed; }
+  .mode-card.locked:active { transform: none; }
+  .mc-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+  .mc-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .mc-info b { font-size: 15px; color: #e2e8f0; }
+  .mc-info small { font-size: 12px; color: #7f92b0; line-height: 1.4; }
+  .mc-status {
+    font-size: 10px; font-weight: 700; color: #5eead4;
+    background: rgba(94,234,212,.1); border: 1px solid rgba(94,234,212,.3);
+    border-radius: 6px; padding: 4px 10px; letter-spacing: .5px; flex-shrink: 0;
+  }
+  .mode-card.op .mc-status {
+    color: #fbbf24; background: rgba(251,191,36,.15); border-color: rgba(251,191,36,.4);
+  }
+  .mode-card.locked .mc-status {
+    color: #64748b; background: #161c2a; border: 1px dashed #334155;
+  }
+  .modes-footer { display: flex; justify-content: center; padding: 6px 0 8px; }
+
+  /* ============ 游戏界面 ============ */
+  .game-screen { width: 100%; max-width: 560px; }
+  .game-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .hud {
+    display: flex; align-items: center; gap: 6px; padding: 7px 8px;
+    background: linear-gradient(180deg, #1a2438, #131b2b);
+    border: 1px solid #2c3c5a; border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.45); flex-wrap: wrap;
+  }
+  .stat {
+    display: flex; align-items: center; gap: 4px; font-size: 14px;
+    font-weight: 700; padding: 4px 8px; background: #0e1626;
+    border: 1px solid #2a3a58; border-radius: 7px; letter-spacing: .3px;
+  }
+  .stat .ico { font-size: 13px; }
+  #lives { color: #f87171; }
+  #gold { color: #fbbf24; }
+  #wave { color: #60a5fa; }
+  .spacer { flex: 1; }
+  .status { font-size: 12px; color: #93a5c4; font-weight: 600; text-align: right; min-width: 100px; padding: 0 4px; }
+  .btn-small {
+    padding: 8px 12px; font-size: 13px; font-weight: 700;
+    color: #06121f; background: linear-gradient(180deg, #5eead4, #22d3ee);
+    border: none; border-radius: 8px; cursor: pointer;
+    transition: transform .12s, filter .12s; font-family: inherit; min-height: 36px;
+  }
+  .btn-small:active:not(:disabled) { transform: scale(.96); filter: brightness(1.08); }
+  .btn-small:disabled { opacity: .35; cursor: not-allowed; }
+  .btn-back {
+    padding: 7px 12px; font-size: 13px; font-weight: 700; color: #94a3b8;
+    background: #0e1626; border: 1px solid #2a3a58; border-radius: 8px;
+    cursor: pointer; transition: all .12s; font-family: inherit; min-height: 36px;
+  }
+  .btn-back:active { color: #e2e8f0; border-color: #4b6a9c; }
+  .btn-ctrl {
+    padding: 6px 9px; font-size: 13px; font-weight: 700; color: #cbd5e1;
+    background: #0e1626; border: 1px solid #2a3a58; border-radius: 8px;
+    cursor: pointer; transition: all .12s; font-family: inherit;
+    min-width: 34px; min-height: 36px;
+    display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .btn-ctrl:active { transform: scale(.94); border-color: #4b6a9c; }
+  .btn-ctrl.active {
+    color: #22d3ee; border-color: #22d3ee;
+    background: rgba(34,211,238,.1); box-shadow: 0 0 12px rgba(34,211,238,.25);
+  }
+  .btn-ctrl.muted { color: #64748b; }
+
+  /* 模式提示条 */
+  .mode-banner {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 8px;
+    flex-wrap: wrap;
+    letter-spacing: .3px;
+  }
+  .mode-banner.visible { display: flex; }
+  .mode-banner.limit { background: linear-gradient(180deg, #2a1010, #1a0808); border: 1px solid #7f1d1d; color: #fca5a5; }
+  .mode-banner.random { background: linear-gradient(180deg, #1e1038, #120826); border: 1px solid #5b21b6; color: #c4b5fd; }
+  .mode-banner.defense { background: linear-gradient(180deg, #101a24, #08121a); border: 1px solid #334155; color: #94a3b8; }
+  .mode-banner.op {
+    background: linear-gradient(90deg, #3a2a08, #5a4210, #3a2a08);
+    border: 1px solid #fbbf24;
+    color: #fef3c7;
+    text-shadow: 0 0 8px rgba(251,191,36,.5);
+    animation: opGlow 1.5s ease-in-out infinite;
+  }
+  @keyframes opGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,.4); }
+    50% { box-shadow: 0 0 20px rgba(251,191,36,.8); }
+  }
+  .mode-banner .banned-icon { font-size: 13px; }
+  .mode-banner .banned-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 7px; border-radius: 4px;
+    background: rgba(0,0,0,.3); font-size: 10px;
+  }
+
+  .canvas-wrap {
+    position: relative; width: 100%; aspect-ratio: 960 / 600;
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid #2c3c5a; box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    background: #0b1220; touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .pause-mask {
+    position: absolute; inset: 0; background: rgba(4, 8, 16, .82);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; z-index: 15;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    animation: fadeIn .2s ease; padding: 16px;
+  }
+  .pause-mask.hidden { display: none; }
+  .pause-icon { font-size: 42px; line-height: 1; }
+  .pause-text {
+    font-size: 24px; font-weight: 900; color: #5eead4;
+    letter-spacing: 6px; text-shadow: 0 0 30px rgba(34,211,238,.7);
+  }
+  .pause-btns { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 240px; }
+  .pause-action-btn {
+    padding: 13px 18px; font-size: 14px; font-weight: 800;
+    letter-spacing: .5px; border-radius: 10px; cursor: pointer;
+    font-family: inherit; transition: transform .14s, filter .14s;
+    border: none; min-height: 46px;
+  }
+  .pause-action-btn:active { transform: scale(.97); filter: brightness(1.08); }
+  .pause-action-btn.primary { color: #06121f; background: linear-gradient(180deg, #5eead4, #22d3ee); }
+  .pause-action-btn.save { color: #fbbf24; background: #1a1508; border: 1px solid #5c4a1e; }
+  .pause-action-btn.quit { color: #fca5a5; background: #2a0e14; border: 1px solid #7f1d1d; }
+
+  .tower-panel {
+    position: absolute; left: 8px; right: 8px; bottom: 8px;
+    width: auto; max-width: 260px;
+    background: rgba(12, 20, 34, .97);
+    border: 1px solid #33486d; border-radius: 9px;
+    padding: 9px 10px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 6px 24px rgba(0,0,0,.7);
+    font-size: 12px; z-index: 10;
+  }
+  .tower-panel.hidden { display: none; }
+  .tp-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 800; font-size: 13px;
+    margin-bottom: 7px; padding-bottom: 6px; border-bottom: 1px solid #26364f;
+  }
+  #tpClose {
+    background: #1a2438; border: 1px solid #33486d; color: #94a3b8;
+    cursor: pointer; font-size: 13px; width: 26px; height: 26px;
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+  }
+  #tpClose:active { color: #f87171; border-color: #7f1d1d; background: rgba(127,29,29,.2); }
+  .tp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; color: #b6c5dc; gap: 6px; }
+  .tp-row .up {
+    background: linear-gradient(180deg, #34d399, #10b981);
+    color: #04121a; border: none; border-radius: 6px;
+    padding: 5px 10px; font-weight: 800; font-size: 11px;
+    cursor: pointer; font-family: inherit; min-height: 30px;
+  }
+  .tp-row .up:active:not(:disabled) { filter: brightness(1.12); transform: scale(.96); }
+  .tp-row .up:disabled { opacity: .35; cursor: not-allowed; }
+  .maxed { color: #fbbf24; font-weight: 700; font-size: 11px; }
+  .tp-sell {
+    width: 100%; margin-top: 6px; padding: 8px;
+    background: #2a1c28; color: #f9a8d4;
+    border: 1px solid #5c2a45; border-radius: 7px;
+    font-weight: 700; font-size: 12px; cursor: pointer; font-family: inherit; min-height: 34px;
+  }
+  .tp-sell:active { background: #3a2233; transform: scale(.98); }
+  .tp-fixed {
+    width: 100%; margin-top: 6px; padding: 7px;
+    background: linear-gradient(180deg, #2a2418, #1d1a12);
+    color: #fbbf24; border: 1px solid #5c4a1e; border-radius: 7px;
+    font-weight: 700; font-size: 11px; text-align: center; letter-spacing: .5px;
+  }
+  .tp-defense-hp {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; padding: 5px 8px; background: #0e1626;
+    border: 1px solid #2a3a58; border-radius: 6px; font-size: 11px; color: #94a3b8;
+  }
+  .tp-defense-hp .hp-val { color: #4ade80; font-weight: 800; font-size: 13px; }
+  .tp-defense-hp.low .hp-val { color: #facc15; }
+  .tp-defense-hp.crit .hp-val { color: #ef4444; }
+  .tp-defense-note {
+    width: 100%; margin-top: 4px; padding: 6px 8px;
+    background: #1a1014; color: #94a3b8;
+    border: 1px solid #3a2530; border-radius: 6px;
+    font-size: 10px; text-align: center; line-height: 1.4;
+  }
+  .tp-defense-note.warn { background: #2a0e14; color: #fca5a5; border-color: #7f1d1d; font-weight: 700; }
+  .tp-suicide-count {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; padding: 8px 10px;
+    background: linear-gradient(180deg, #3a0e14, #1a0508);
+    border: 1px solid #7f1d1d; border-radius: 6px;
+  }
+  .tp-suicide-count .label { font-size: 11px; color: #fca5a5; font-weight: 700; letter-spacing: .5px; }
+  .tp-suicide-count .count {
+    font-size: 20px; font-weight: 900; color: #ef4444;
+    text-shadow: 0 0 12px rgba(239,68,68,.8);
+    font-family: 'Courier New', monospace; letter-spacing: 1px;
+  }
+  .tp-mine-status {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; padding: 8px 10px;
+    background: linear-gradient(180deg, #3a0e14, #1a0508);
+    border: 1px solid #7f1d1d; border-radius: 6px;
+  }
+  .tp-mine-status .label { font-size: 11px; color: #fca5a5; font-weight: 700; letter-spacing: .5px; }
+  .tp-mine-status .value {
+    font-size: 14px; font-weight: 900; color: #ef4444;
+    text-shadow: 0 0 12px rgba(239,68,68,.8); letter-spacing: 1px;
+  }
+  .tp-demon {
+    width: 100%; margin-top: 6px; padding: 8px 5px;
+    background: linear-gradient(180deg, #4c1d24, #2a0e14);
+    color: #fca5a5; border: 1px solid #7f1d1d;
+    border-radius: 7px; font-weight: 800; font-size: 11px;
+    cursor: pointer; letter-spacing: .4px;
+    text-shadow: 0 0 8px rgba(239,68,68,.6);
+    font-family: inherit; animation: demonPulse 1.6s ease-in-out infinite;
+    line-height: 1.3; min-height: 38px;
+  }
+  .tp-demon:active:not(:disabled) {
+    background: linear-gradient(180deg, #6b2430, #3d141d);
+    border-color: #dc2626; filter: brightness(1.15); transform: scale(.98);
+  }
+  .tp-demon:disabled { opacity: .4; cursor: not-allowed; animation: none; }
+  .tp-demon small { font-weight: 400; opacity: .75; font-size: 9px; display: block; margin-top: 1px; }
+  @keyframes demonPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.4); }
+    50% { box-shadow: 0 0 12px 2px rgba(239,68,68,.55); }
+  }
+  .tp-demon-active {
+    width: 100%; margin-top: 6px; padding: 8px 5px;
+    background: linear-gradient(180deg, #7f1d1d, #450a0a);
+    color: #fef2f2; border: 1px solid #dc2626; border-radius: 7px;
+    font-weight: 800; font-size: 11px; text-align: center;
+    letter-spacing: .5px; text-shadow: 0 0 10px rgba(255,255,255,.5);
+    animation: demonPulse 0.8s ease-in-out infinite;
+  }
+  .tp-demon-locked {
+    width: 100%; margin-top: 6px; padding: 7px 5px;
+    background: #161c2a; color: #64748b;
+    border: 1px dashed #334155; border-radius: 7px;
+    font-weight: 600; font-size: 10px; text-align: center; letter-spacing: .3px;
+  }
+  /* 爽模式专属：塔面板的金色标记 */
+  .tp-op-tag {
+    width: 100%; margin-top: 6px; padding: 8px 5px;
+    background: linear-gradient(90deg, #3a2a08, #5a4210, #3a2a08);
+    color: #fef3c7; border: 1px solid #fbbf24;
+    border-radius: 7px; font-weight: 800; font-size: 11px;
+    text-align: center; letter-spacing: .5px;
+    text-shadow: 0 0 8px rgba(251,191,36,.6);
+    animation: opGlow 1.5s ease-in-out infinite;
+  }
+
+  .shop { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
+  .tower-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 10px; background: linear-gradient(180deg, #182238, #111a2b);
+    border: 1px solid #2c3c5a; border-radius: 10px;
+    cursor: pointer; text-align: left; color: #cbd5e1;
+    transition: all .12s; font-family: inherit; min-height: 56px;
+  }
+  .tower-btn:active:not(.locked):not(.banned) { border-color: #4b6a9c; transform: scale(.97); }
+  .tower-btn.active {
+    border-color: #22d3ee;
+    box-shadow: 0 0 0 2px rgba(34,211,238,.25), 0 0 18px rgba(34,211,238,.25);
+    background: linear-gradient(180deg, #1c2c46, #14203a);
+  }
+  .tower-btn.poor { opacity: .45; }
+  .tower-btn.locked { opacity: .4; cursor: not-allowed; }
+  .tower-btn.banned {
+    opacity: .4;
+    cursor: not-allowed;
+    border-color: #7f1d1d;
+    background: linear-gradient(180deg, #2a0e14, #1a0508);
+  }
+  /* 爽模式：所有塔变成金色边框 + 1 金币 */
+  .tower-btn.op-tower {
+    border-color: #7f5f1d;
+    background: linear-gradient(180deg, #2a2418, #1a1508);
+  }
+  .tower-btn.op-tower.active {
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 2px rgba(251,191,36,.4), 0 0 18px rgba(251,191,36,.5);
+  }
+  .tower-btn.op-tower .tb-cost {
+    color: #fef3c7;
+    text-shadow: 0 0 8px rgba(251,191,36,.8);
+  }
+  /* 满级标记 */
+  .tb-op-badge {
+    display: inline-block;
+    font-size: 9px; font-weight: 800;
+    color: #1a0e00; background: linear-gradient(180deg, #fbbf24, #f59e0b);
+    padding: 1px 5px; border-radius: 4px;
+    margin-left: 4px;
+    vertical-align: middle;
+    letter-spacing: .3px;
+  }
+
+  .tower-btn.defense-type { border-color: #475569; background: linear-gradient(180deg, #1e2a3e, #141c2e); }
+  .tower-btn.defense-type.active {
+    border-color: #94a3b8;
+    box-shadow: 0 0 0 2px rgba(148,163,184,.35), 0 0 18px rgba(148,163,184,.3);
+  }
+  .tower-btn.suicide-type { border-color: #7f1d1d; background: linear-gradient(180deg, #2a0e14, #1a0508); }
+  .tower-btn.suicide-type.active {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 2px rgba(239,68,68,.35), 0 0 18px rgba(239,68,68,.4);
+  }
+  .tower-btn.mine-type { border-color: #7f1d1d; background: linear-gradient(180deg, #2a0e14, #150206); }
+  .tower-btn.mine-type.active {
+    border-color: #f97316;
+    box-shadow: 0 0 0 2px rgba(249,115,22,.4), 0 0 18px rgba(249,115,22,.45);
+  }
+
+  .tb-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+  .tb-info { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .tb-info b { font-size: 13px; color: #e2e8f0; }
+  .tb-info small { font-size: 10px; color: #7f92b0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tb-cost { font-size: 12px; font-weight: 800; color: #fbbf24; flex-shrink: 0; }
+
+  .overlay {
+    position: absolute; inset: 0; background: rgba(4, 8, 16, .85);
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    z-index: 20; padding: 12px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay .panel {
+    text-align: center; padding: 20px 22px;
+    background: linear-gradient(180deg, #16213a, #0c1526);
+    border: 1px solid #33486d; border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.8);
+    animation: pop .35s cubic-bezier(.2,1.4,.5,1);
+    width: 100%; max-width: 320px;
+  }
+  @keyframes pop { from { transform: scale(.82); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .overlay h1 { font-size: 24px; margin-bottom: 8px; letter-spacing: 2px; }
+  .overlay h1.win { color: #4ade80; text-shadow: 0 0 24px rgba(74,222,128,.6); }
+  .overlay h1.lose { color: #f87171; text-shadow: 0 0 24px rgba(248,113,113,.6); }
+  .overlay h1.endless-title { color: #fbbf24; text-shadow: 0 0 24px rgba(251,191,36,.6); }
+  .overlay h1.mode-title { color: #a78bfa; text-shadow: 0 0 24px rgba(167,139,250,.6); }
+  .overlay h1.op-title { color: #fbbf24; text-shadow: 0 0 30px rgba(251,191,36,.8); }
+  .overlay p { color: #93a5c4; margin-bottom: 16px; font-size: 12px; line-height: 1.55; }
+  .ov-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  #restartBtn, #menuBtn {
+    padding: 11px 18px; font-size: 13px; font-weight: 800;
+    letter-spacing: .5px; border: none; border-radius: 9px;
+    cursor: pointer; font-family: inherit;
+    transition: transform .14s, filter .14s;
+    flex: 1; min-width: 110px; min-height: 42px;
+  }
+  #restartBtn { color: #06121f; background: linear-gradient(180deg, #5eead4, #22d3ee); }
+  #menuBtn { color: #cbd5e1; background: #1a2438; border: 1px solid #33486d; }
+  #restartBtn:active, #menuBtn:active { transform: scale(.97); filter: brightness(1.08); }
+
+  .toast {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    padding: 8px 18px; background: rgba(220, 60, 60, .92);
+    border-radius: 8px; font-size: 12px; font-weight: 700;
+    pointer-events: none; opacity: 0; transition: opacity .2s;
+    z-index: 30; white-space: nowrap; max-width: 92%;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 360px) {
+    .stat { font-size: 12px; padding: 3px 6px; }
+    .stat .ico { font-size: 11px; }
+    .btn-small { font-size: 12px; padding: 7px 10px; }
+    .btn-back { font-size: 12px; padding: 6px 9px; }
+    .btn-ctrl { font-size: 12px; padding: 5px 7px; min-width: 30px; min-height: 32px; }
+    .tb-info small { display: none; }
+    .tb-icon { font-size: 18px; }
+    .tb-info b { font-size: 12px; }
+    .tb-cost { font-size: 11px; }
+    .menu-header h1 { font-size: 24px; }
+    .lc-name { font-size: 16px; }
+    .pause-text { font-size: 20px; letter-spacing: 4px; }
+    .pause-icon { font-size: 36px; }
+    .btn-ghost, .btn-primary { font-size: 12px; padding: 9px 14px; }
+    .endless-header h1 { font-size: 24px; }
+    .er-stat .value { font-size: 22px; }
+    .er-stat .value.small { font-size: 15px; }
+    .ea-info b { font-size: 14px; }
+    .ea-info small { font-size: 11px; }
+    .ea-icon { font-size: 20px; }
+  }
+
+  @media (min-width: 520px) {
+    .level-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="menu-screen" id="menuScreen">
+  <div class="menu-header">
+    <h1>🏰 塔防 · 关卡模式</h1>
+    <p>选择关卡，守护你的城堡</p>
+  </div>
+  <div class="level-grid" id="levelGrid"></div>
+  <div class="menu-footer">
+    <button class="btn-ghost" id="resetProgress">重置进度</button>
+    <button class="btn-primary gold" id="endlessModeBtn">∞ 无尽模式</button>
+    <button class="btn-primary purple" id="moreModesBtn">更多模式</button>
+  </div>
+</div>
+
+<div class="endless-screen hidden" id="endlessScreen">
+  <div class="endless-header">
+    <h1>∞ 无尽模式</h1>
+    <p>怪物无穷无尽，你能撑到第几波？</p>
+  </div>
+  <div class="endless-record" id="endlessRecord"></div>
+  <div class="endless-actions" id="endlessActions"></div>
+  <div class="modes-footer">
+    <button class="btn-ghost" id="backToMenuFromEndless">← 返回主菜单</button>
+  </div>
+</div>
+
+<div class="modes-screen hidden" id="modesScreen">
+  <div class="modes-header">
+    <h1>🎮 更多模式</h1>
+    <p>选择挑战，突破你的极限</p>
+  </div>
+  <div class="mode-list" id="modeList"></div>
+  <div class="modes-footer">
+    <button class="btn-ghost" id="backToMenuFromModes">← 返回主菜单</button>
+  </div>
+</div>
+
+<div class="game-screen hidden" id="gameScreen">
+  <div class="game-wrap">
+    <div class="hud">
+      <button class="btn-back" id="backToMenu">←</button>
+      <div class="stat"><span class="ico">❤️</span><span id="lives">20</span></div>
+      <div class="stat"><span class="ico">🪙</span><span id="gold">200</span></div>
+      <div class="stat"><span class="ico">🌊</span><span id="wave">0</span>/<span id="maxWave">8</span></div>
+      <div class="spacer"></div>
+      <div class="status" id="waveStatus">准备中…</div>
+      <button class="btn-ctrl" id="pauseBtn" title="暂停 / 继续">⏸</button>
+      <button class="btn-ctrl" id="speedBtn" title="切换倍速">1×</button>
+      <button class="btn-ctrl muted" id="soundBtn" title="音效开关">🔇</button>
+      <button class="btn-small" id="startBtn">开始</button>
+    </div>
+
+    <div class="mode-banner" id="modeBanner"></div>
+
+    <div class="canvas-wrap">
+      <canvas id="cv" width="960" height="600"></canvas>
+      <div class="tower-panel hidden" id="towerPanel"></div>
+      <div class="toast" id="toast"></div>
+
+      <div class="pause-mask hidden" id="pauseMask">
+        <div class="pause-icon">⏸️</div>
+        <div class="pause-text">已暂停</div>
+        <div class="pause-btns">
+          <button class="pause-action-btn primary" id="pauseResume">继续游戏</button>
+          <button class="pause-action-btn save" id="pauseSaveExit">💾 保存并退出</button>
+          <button class="pause-action-btn quit" id="pauseQuitExit">放弃并退出</button>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="overlay">
+        <div class="panel">
+          <h1 id="ovTitle">游戏结束</h1>
+          <p id="ovDesc"></p>
+          <div class="ov-btns">
+            <button id="restartBtn">重新开始</button>
+            <button id="menuBtn">主菜单</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shop" id="shop"></div>
+  </div>
+</div>
+<script>
+/* =========================================================
+   基础常量
+   ========================================================= */
+const W = 960, H = 600;
+const MAX_LEVEL = 5;
+
+const DEMON_PACT_COST = 50;
+const DEMON_PACT_DURATION = 10;
+const FIXED_TOWER_MIN_DIST = 60;
+
+/* 防御炮台 */
+const DEFENSE_TOWER_COST = 50;
+const DEFENSE_TOWER_MAX_HP = 50;
+const DEFENSE_TOWER_BITE_RATE = 5;
+const DEFENSE_TOWER_BITE_RANGE = 26;
+const DEFENSE_TOWER_PATH_DIST = 22;
+const DEFENSE_TOWER_SELL_RATIO = 0.5;
+
+/* 同归于尽之炮 */
+const SUICIDE_CANNON_COST = 100;
+const SUICIDE_CANNON_DAMAGE = 250;
+const SUICIDE_CANNON_RADIUS = 90;
+const SUICIDE_CANNON_COUNTDOWN = 3;
+
+/* 同归于尽之地雷 */
+const MINE_COST = 125;
+const MINE_DAMAGE = 250;
+const MINE_RADIUS = 90;
+const MINE_TRIGGER_RADIUS = 30;
+
+const POISON_SLOW = 0.2;
+const ENDLESS_HP_GROWTH = Math.pow(1.35, 0.25);
+const ENDLESS_SPD_GROWTH = 3 * 0.25;
+const ENDLESS_REWARD_GROWTH = 1.8 * 0.25;
+
+const SAVE_KEY = 'towerDefenseEndlessSave';
+
+const DEFENSE_MODE_START_GOLD = 1000;
+const DEFENSE_MODE_START_LIVES = 50;
+const DEFENSE_MODE_WAVE_BONUS = 150;
+
+/* 爽就完了模式 */
+const OP_MODE_START_LIVES = 100;
+const OP_MODE_DEFENSE_HP = 5000;      /* 防御炮台血量 */
+const OP_MODE_BITE_RATE = 50;          /* 啃咬速率：5000 / 50 = 100 秒 */
+const OP_MODE_TOWER_COST = 1;          /* 所有塔 1 金币 */
+const OP_MODE_DAMAGE_BASE = 1.35;      /* 伤害缩放系数，与怪物血量同比例 */
+
+const BANNED_COUNT = 3;
+
+/* =========================================================
+   防御塔定义
+   ========================================================= */
+const TOWER_TYPES = {
+  arrow: { key:'arrow', name:'箭塔', icon:'🏹', cost:50, color:'#4ade80', range:115, damage:9, fireRate:1.3, desc:'单体攻击 · 射速快' },
+  cannon: { key:'cannon', name:'炮塔', icon:'💣', cost:110, color:'#fb923c', range:135, damage:24, fireRate:0.6, splash:48, desc:'范围溅射伤害' },
+  frost: { key:'frost', name:'冰塔', icon:'❄️', cost:80, color:'#38bdf8', range:110, damage:5, fireRate:1.1, slow:0.5, slowDur:1.8, desc:'减速敌人 50%' },
+  sniper: { key:'sniper', name:'狙击塔', icon:'🎯', cost:160, color:'#c084fc', range:290, damage:95, fireRate:0.5, desc:'超远射程 · 高单发点杀' },
+  laser: { key:'laser', name:'激光塔', icon:'⚡', cost:180, color:'#f472b6', range:130, damage:13, fireRate:4.5, desc:'持续光束 · 高频攻击' },
+  poison: { key:'poison', name:'毒塔', icon:'☠️', cost:130, color:'#a3e635', range:120, damage:6, fireRate:0.9, poisonDmg:9, poisonDur:4, desc:'附加毒伤 · 中毒减速' }
+};
+
+const DEFENSE_TOWER_TYPE = { key:'defense', name:'防御炮台', icon:'🛡️', cost:DEFENSE_TOWER_COST, color:'#94a3b8', desc:'建在路径上 · 扛50次啃咬' };
+const SUICIDE_CANNON_TYPE = { key:'suicide', name:'同归于尽之炮', icon:'💥', cost:SUICIDE_CANNON_COST, color:'#ef4444', desc:'全图可放 · 3秒后爆炸' };
+const MINE_TYPE = { key:'mine', name:'同归于尽之地雷', icon:'🧨', cost:MINE_COST, color:'#f97316', desc:'全图可放 · 敌人踩到就炸' };
+
+/* =========================================================
+   关卡配置
+   ========================================================= */
+const LEVELS = [
+  {
+    id: 1, name: '入门平原', desc: '开阔的地形，笔直的大道。只有一波敌人，熟悉基础操作。',
+    stars: 1,
+    path: [
+      {x:-40, y: 80}, {x:200, y: 80}, {x:200, y:240}, {x: 80, y:240},
+      {x: 80, y:480}, {x:400, y:480}, {x:400, y:160}, {x:600, y:160},
+      {x:600, y:400}, {x:780, y:400}, {x:780, y: 80}, {x:1000, y: 80}
+    ],
+    startGold: 220, upgradeMult: 1.0, damageMult: 1.0, waveCount: 1, hpMult: 0.85, speedMult: 0.95, rewardMult: 1.15,
+    fixedTowers: [ { x: 870, y: 180, type: 'frost' }, { x: 860, y: 260, type: 'cannon' } ],
+    unlockTower: 'frost'
+  },
+  {
+    id: 2, name: 'Z字回廊', desc: '折线路径，敌人来回穿梭。三波敌人，试试用冰塔拖住它们。',
+    stars: 2,
+    path: [
+      {x:-40, y:150}, {x:180, y:150}, {x:180, y:450}, {x:380, y:450},
+      {x:380, y:150}, {x:580, y:150}, {x:580, y:450}, {x:780, y:450},
+      {x:780, y:150}, {x:1000, y:150}
+    ],
+    startGold: 200, upgradeMult: 1.15, damageMult: 1.0, waveCount: 3, hpMult: 1.0, speedMult: 1.0, rewardMult: 1.05,
+    fixedTowers: [ { x: 860, y: 240, type: 'frost' }, { x: 860, y: 330, type: 'cannon' } ],
+    unlockTower: 'sniper'
+  },
+  {
+    id: 3, name: 'U形深渊', desc: '双U地形，敌人绕远路但也会分散。五波敌人，考验纵深布防。',
+    stars: 3,
+    path: [
+      {x:-40, y:100}, {x:150, y:100}, {x:150, y:500}, {x:400, y:500},
+      {x:400, y:200}, {x:600, y:200}, {x:600, y:500}, {x:850, y:500},
+      {x:850, y:100}, {x:1000, y:100}
+    ],
+    startGold: 195, upgradeMult: 1.3, damageMult: 0.95, waveCount: 5, hpMult: 1.15, speedMult: 1.0, rewardMult: 1.0,
+    fixedTowers: [ { x: 920, y: 200, type: 'frost' }, { x: 920, y: 310, type: 'cannon' } ],
+    unlockTower: 'laser'
+  },
+  {
+    id: 4, name: '蛇形峡谷', desc: '蛇形长道，绕得越久越危险。十波敌人，需要全路径覆盖。',
+    stars: 4,
+    path: [
+      {x:-40, y: 80}, {x: 80, y: 80}, {x: 80, y:520}, {x:240, y:520},
+      {x:240, y: 80}, {x:400, y: 80}, {x:400, y:520}, {x:560, y:520},
+      {x:560, y: 80}, {x:720, y: 80}, {x:720, y:520}, {x:880, y:520},
+      {x:880, y:200}, {x:1000, y:200}
+    ],
+    startGold: 175, upgradeMult: 1.5, damageMult: 0.9, waveCount: 10, hpMult: 1.3, speedMult: 1.05, rewardMult: 0.98,
+    fixedTowers: [ { x: 950, y: 320, type: 'frost' }, { x: 950, y: 440, type: 'cannon' } ],
+    unlockTower: 'poison'
+  },
+  {
+    id: 5, name: '螺旋要塞', desc: '螺旋路线步步紧逼。满波 12 波，适合用长射程塔封锁多个拐角。',
+    stars: 5,
+    path: [
+      {x:-40, y:300}, {x:120, y:300}, {x:120, y:100}, {x:300, y:100},
+      {x:300, y:500}, {x:480, y:500}, {x:480, y:200}, {x:660, y:200},
+      {x:660, y:450}, {x:820, y:450}, {x:820, y:150}, {x:1000, y:150}
+    ],
+    startGold: 165, upgradeMult: 1.7, damageMult: 0.85, waveCount: 12, hpMult: 1.45, speedMult: 1.1, rewardMult: 0.95,
+    fixedTowers: [ { x: 900, y: 260, type: 'frost' }, { x: 900, y: 370, type: 'cannon' } ],
+    unlockTower: null
+  },
+  {
+    id: 6, name: '死亡锁链', desc: '最长的蛇形路线，每一段都藏着杀机。12 波，只有最强者能通关。',
+    stars: 6,
+    path: [
+      {x:-40, y: 80}, {x:100, y: 80}, {x:100, y:520}, {x:240, y:520},
+      {x:240, y: 80}, {x:380, y: 80}, {x:380, y:520}, {x:520, y:520},
+      {x:520, y: 80}, {x:660, y: 80}, {x:660, y:520}, {x:800, y:520},
+      {x:800, y: 80}, {x:1000, y: 80}
+    ],
+    startGold: 155, upgradeMult: 2.0, damageMult: 0.8, waveCount: 12, hpMult: 1.6, speedMult: 1.15, rewardMult: 0.92,
+    fixedTowers: [ { x: 880, y: 190, type: 'frost' }, { x: 880, y: 310, type: 'cannon' } ],
+    unlockTower: null
+  }
+];
+
+/* =========================================================
+   全局状态
+   ========================================================= */
+let progress = {
+  unlockedLevel: 1,
+  completed: {},
+  endlessBest: 0,
+  endlessMaxGold: 0,
+  limitBest: 0,
+  randomBest: 0,
+  defenseBest: 0,
+  opBest: 0
+};
+
+let game = null;
+let currentScreen = 'menu';
+let settings = { speedMultiplier: 1, soundEnabled: false };
+
+/* =========================================================
+   DOM
+   ========================================================= */
+const menuScreenEl = document.getElementById('menuScreen');
+const endlessScreenEl = document.getElementById('endlessScreen');
+const modesScreenEl = document.getElementById('modesScreen');
+const gameScreenEl = document.getElementById('gameScreen');
+const levelGridEl = document.getElementById('levelGrid');
+const modeListEl = document.getElementById('modeList');
+const endlessRecordEl = document.getElementById('endlessRecord');
+const endlessActionsEl = document.getElementById('endlessActions');
+const resetProgressBtn = document.getElementById('resetProgress');
+const endlessModeBtn = document.getElementById('endlessModeBtn');
+const moreModesBtn = document.getElementById('moreModesBtn');
+const backToMenuFromModes = document.getElementById('backToMenuFromModes');
+const backToMenuFromEndless = document.getElementById('backToMenuFromEndless');
+
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+const livesEl = document.getElementById('lives');
+const goldEl = document.getElementById('gold');
+const waveEl = document.getElementById('wave');
+const maxWaveEl = document.getElementById('maxWave');
+const waveStatusEl = document.getElementById('waveStatus');
+const startBtn = document.getElementById('startBtn');
+const backToMenuBtn = document.getElementById('backToMenu');
+const pauseBtn = document.getElementById('pauseBtn');
+const speedBtn = document.getElementById('speedBtn');
+const soundBtn = document.getElementById('soundBtn');
+const pauseMaskEl = document.getElementById('pauseMask');
+const pauseResumeBtn = document.getElementById('pauseResume');
+const pauseSaveExitBtn = document.getElementById('pauseSaveExit');
+const pauseQuitExitBtn = document.getElementById('pauseQuitExit');
+const shopEl = document.getElementById('shop');
+const towerPanelEl = document.getElementById('towerPanel');
+const modeBannerEl = document.getElementById('modeBanner');
+const overlayEl = document.getElementById('overlay');
+const ovTitleEl = document.getElementById('ovTitle');
+const ovDescEl = document.getElementById('ovDesc');
+const restartBtn = document.getElementById('restartBtn');
+const menuBtn = document.getElementById('menuBtn');
+const toastEl = document.getElementById('toast');
+
+/* =========================================================
+   音效
+   ========================================================= */
+let audioCtx = null;
+let masterGain = null;
+const MASTER_VOLUME = 0.5;
+
+function ensureAudio() {
+  if (!settings.soundEnabled) return null;
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = MASTER_VOLUME;
+      masterGain.connect(audioCtx.destination);
+    } catch (e) { return null; }
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq, duration, type, volume) {
+  const ac = ensureAudio();
+  if (!ac) return;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(freq, ac.currentTime);
+  const vol = volume || 0.3;
+  const now = ac.currentTime;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(vol, now + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(gain); gain.connect(masterGain);
+  osc.start(now); osc.stop(now + duration + 0.02);
+}
+
+function playNoise(duration, volume) {
+  const ac = ensureAudio();
+  if (!ac) return;
+  const bufferSize = Math.floor(ac.sampleRate * duration);
+  const buffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    const env = 1 - i / bufferSize;
+    data[i] = (Math.random() * 2 - 1) * env * env;
+  }
+  const src = ac.createBufferSource();
+  src.buffer = buffer;
+  const gain = ac.createGain();
+  const now = ac.currentTime;
+  const vol = volume || 0.5;
+  gain.gain.setValueAtTime(vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  src.connect(gain); gain.connect(masterGain);
+  src.start(now);
+}
+
+const sfxThrottle = {};
+function canPlaySfx(key, intervalMs) {
+  const now = performance.now();
+  if (!sfxThrottle[key] || now - sfxThrottle[key] > intervalMs) {
+    sfxThrottle[key] = now;
+    return true;
+  }
+  return false;
+}
+
+function sfxArrow() { if (!canPlaySfx('arrow', 80)) return; playTone(1200, 0.08, 'triangle', 0.35); }
+function sfxCannon() { if (!canPlaySfx('cannon', 150)) return; playTone(180, 0.18, 'square', 0.5); playTone(120, 0.22, 'sawtooth', 0.3); }
+function sfxFrost() { if (!canPlaySfx('frost', 120)) return; playTone(800, 0.12, 'sine', 0.3); playTone(1000, 0.1, 'sine', 0.25); }
+function sfxSniper() { playTone(600, 0.18, 'sawtooth', 0.45); playTone(1400, 0.14, 'triangle', 0.35); }
+function sfxLaser() { if (!canPlaySfx('laser', 120)) return; playTone(1600, 0.05, 'sine', 0.28); }
+function sfxPoison() { if (!canPlaySfx('poison', 150)) return; playTone(400, 0.14, 'sine', 0.32); playTone(280, 0.16, 'sine', 0.2); }
+function sfxExplosion() { playNoise(0.7, 0.7); playTone(80, 0.5, 'square', 0.55); playTone(50, 0.7, 'sawtooth', 0.4); }
+function sfxPlaceTower() { playTone(900, 0.1, 'sine', 0.4); playTone(1300, 0.12, 'sine', 0.35); }
+function sfxPlaceDefense() { playTone(600, 0.12, 'square', 0.4); playTone(450, 0.15, 'square', 0.3); }
+function sfxPlaceSuicide() { playTone(1200, 0.08, 'sawtooth', 0.45); playTone(1600, 0.08, 'sawtooth', 0.4); playTone(800, 0.12, 'sawtooth', 0.35); }
+function sfxPlaceMine() { playTone(500, 0.1, 'square', 0.4); playTone(400, 0.12, 'square', 0.35); playTone(300, 0.15, 'square', 0.3); }
+function sfxMineTrigger() { playNoise(0.3, 0.6); playTone(150, 0.25, 'square', 0.5); playTone(90, 0.35, 'sawtooth', 0.4); }
+function sfxUpgrade() { playTone(1000, 0.1, 'triangle', 0.42); playTone(1400, 0.18, 'triangle', 0.38); }
+function sfxSell() { playTone(700, 0.14, 'sine', 0.35); playTone(400, 0.18, 'sine', 0.3); }
+function sfxWaveStart() { playTone(300, 0.22, 'sawtooth', 0.48); playTone(450, 0.28, 'sawtooth', 0.42); }
+function sfxWin() { playTone(800, 0.18, 'sine', 0.55); playTone(1000, 0.18, 'sine', 0.55); playTone(1200, 0.4, 'sine', 0.6); }
+function sfxLose() { playTone(400, 0.35, 'sawtooth', 0.5); playTone(200, 0.6, 'sawtooth', 0.55); }
+function sfxDemon() { playTone(150, 0.5, 'sawtooth', 0.55); playTone(100, 0.75, 'square', 0.5); playTone(200, 0.6, 'sawtooth', 0.35); }
+function sfxCountdown() { playTone(900, 0.07, 'square', 0.35); }
+function sfxSave() { playTone(700, 0.1, 'sine', 0.4); playTone(1000, 0.12, 'sine', 0.4); playTone(1400, 0.18, 'sine', 0.35); }
+function sfxLoad() { playTone(1200, 0.1, 'sine', 0.4); playTone(900, 0.12, 'sine', 0.4); playTone(600, 0.18, 'sine', 0.35); }
+
+/* =========================================================
+   存档
+   ========================================================= */
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem('towerDefenseProgress');
+    if (raw) {
+      const data = JSON.parse(raw);
+      progress.unlockedLevel = data.unlockedLevel || 1;
+      progress.completed = data.completed || {};
+      progress.endlessBest = data.endlessBest || 0;
+      progress.endlessMaxGold = data.endlessMaxGold || 0;
+      progress.limitBest = data.limitBest || 0;
+      progress.randomBest = data.randomBest || 0;
+      progress.defenseBest = data.defenseBest || 0;
+      progress.opBest = data.opBest || 0;
+    }
+    const settingsRaw = localStorage.getItem('towerDefenseSettings');
+    if (settingsRaw) {
+      const s = JSON.parse(settingsRaw);
+      settings.speedMultiplier = s.speedMultiplier === 2 ? 2 : 1;
+      settings.soundEnabled = !!s.soundEnabled;
+    }
+  } catch (e) {}
+}
+
+function saveProgress() {
+  try { localStorage.setItem('towerDefenseProgress', JSON.stringify(progress)); } catch (e) {}
+}
+
+function saveSettings() {
+  try { localStorage.setItem('towerDefenseSettings', JSON.stringify(settings)); } catch (e) {}
+}
+
+function getEndlessSaveInfo() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return {
+      wave: data.game ? data.game.wave : 0,
+      gold: data.game ? Math.floor(data.game.gold) : 0,
+      lives: data.game ? data.game.lives : 0,
+      savedAt: data.savedAt || 0
+    };
+  } catch (e) { return null; }
+}
+
+function saveEndlessGame() {
+  if (!game || game.mode !== 'endless') return false;
+  if (game.state !== 'playing' && game.state !== 'paused') return false;
+  try {
+    const data = {
+      version: 1, savedAt: Date.now(),
+      game: {
+        levelId: game.level.id, mode: 'endless', state: 'paused',
+        lives: game.lives, gold: game.gold, wave: game.wave, time: 0,
+        towers: game.towers.map(t => ({ x: t.x, y: t.y, type: t.type, dmgLvl: t.dmgLvl, rateLvl: t.rateLvl, angle: t.angle, invested: t.invested, fixed: !!t.fixed })),
+        defenses: game.defenses.map(d => ({ x: d.x, y: d.y, hp: d.hp, maxHp: d.maxHp, bitten: d.bitten, dead: false, invested: d.invested })),
+        suicideCannons: game.suicideCannons.filter(s => !s.exploded).map(s => ({ x: s.x, y: s.y, countdown: s.countdown, exploded: false, invested: s.invested, lastCountdownInt: s.lastCountdownInt })),
+        mines: game.mines.map(m => ({ x: m.x, y: m.y, invested: m.invested })),
+        spawnQueue: game.spawnQueue.slice(), spawnTimer: game.spawnTimer, spawnInterval: game.spawnInterval,
+        waveActive: game.waveActive, betweenTimer: game.betweenTimer,
+        demonPactUsed: game.demonPactUsed, demonPactTimer: game.demonPactTimer
+      }
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    return true;
+  } catch (e) { return false; }
+}
+
+function loadEndlessGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+
+function deleteEndlessSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
+
+function restoreEndlessGame(saveData) {
+  const baseLevel = LEVELS.find(l => l.id === 6);
+  if (!baseLevel) return null;
+  const endlessLevel = {
+    id: 999, name: '无尽模式', desc: '怪物无穷无尽', stars: 6,
+    path: baseLevel.path, startGold: 300, upgradeMult: 1.6, damageMult: 0.9,
+    waveCount: Infinity, hpMult: 1.4, speedMult: 1.1, rewardMult: 1.0,
+    fixedTowers: baseLevel.fixedTowers, unlockTower: null
+  };
+  const sg = saveData.game;
+  game = createGameState(endlessLevel, 'endless');
+  game.lives = sg.lives; game.gold = sg.gold; game.wave = sg.wave; game.time = 0;
+  game.state = 'paused';
+  game.demonPactUsed = !!sg.demonPactUsed;
+  game.demonPactTimer = sg.demonPactTimer || 0;
+  game.towers = (sg.towers || []).map(t => ({ x: t.x, y: t.y, type: t.type, dmgLvl: t.dmgLvl, rateLvl: t.rateLvl, cooldown: 0, angle: t.angle || -Math.PI/2, invested: t.invested || 0, fixed: !!t.fixed }));
+  game.defenses = (sg.defenses || []).map(d => ({ x: d.x, y: d.y, hp: d.hp, maxHp: d.maxHp || DEFENSE_TOWER_MAX_HP, bitten: d.bitten, dead: false, invested: d.invested || DEFENSE_TOWER_COST }));
+  game.suicideCannons = (sg.suicideCannons || []).map(s => ({ x: s.x, y: s.y, countdown: s.countdown, exploded: false, invested: s.invested || SUICIDE_CANNON_COST, lastCountdownInt: s.lastCountdownInt || Math.ceil(s.countdown) }));
+  game.mines = (sg.mines || []).map(m => ({ x: m.x, y: m.y, exploded: false, invested: m.invested || MINE_COST }));
+  game.spawnQueue = sg.spawnQueue || [];
+  game.spawnTimer = sg.spawnTimer || 0;
+  game.spawnInterval = sg.spawnInterval || 1;
+  game.waveActive = !!sg.waveActive;
+  game.betweenTimer = sg.betweenTimer || 3;
+  return game;
+}
+
+/* =========================================================
+   工具函数
+   ========================================================= */
+function distToSeg(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+function minDistToPath(px, py, path) {
+  let min = Infinity;
+  for (let i = 0; i < path.length - 1; i++) {
+    const d = distToSeg(px, py, path[i].x, path[i].y, path[i+1].x, path[i+1].y);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
+/* 是否为无限模式（无尽 / 生存赛 / 爽） */
+function isInfiniteMode() {
+  if (!game) return false;
+  return game.isEndless || game.mode === 'defense' || game.mode === 'op';
+}
+
+/* 塔伤害（爽模式下按波数缩放） */
+function towerDamage(t) {
+  let base = TOWER_TYPES[t.type].damage * (1 + 0.35 * (t.dmgLvl - 1));
+  const mult = game ? game.level.damageMult : 1;
+  base *= mult;
+  if (game && game.mode === 'op') {
+    /* 爽模式：伤害与小怪血量同比例指数增长 */
+    base *= Math.pow(OP_MODE_DAMAGE_BASE, Math.max(0, game.wave - 1));
+  }
+  return base;
+}
+
+function towerFireRate(t) {
+  return TOWER_TYPES[t.type].fireRate * (1 + 0.25 * (t.rateLvl - 1));
+}
+
+function upgradeCost(t, kind) {
+  const base = TOWER_TYPES[t.type].cost;
+  const lvl = kind === 'dmg' ? t.dmgLvl : t.rateLvl;
+  const mult = game ? game.level.upgradeMult : 1;
+  return Math.floor(base * 0.65 * lvl * mult);
+}
+
+/* 塔造价（爽模式下全部 1 金币） */
+function getTowerCost(key) {
+  if (game && game.mode === 'op') return OP_MODE_TOWER_COST;
+  if (key === 'defense') return DEFENSE_TOWER_COST;
+  if (key === 'suicide') return SUICIDE_CANNON_COST;
+  if (key === 'mine') return MINE_COST;
+  return TOWER_TYPES[key] ? TOWER_TYPES[key].cost : 0;
+}
+
+/* 防御炮台血量（爽模式下 5000） */
+function getDefenseMaxHp() {
+  if (game && game.mode === 'op') return OP_MODE_DEFENSE_HP;
+  return DEFENSE_TOWER_MAX_HP;
+}
+
+/* 防御炮台啃咬速率（爽模式下 50/秒 → 100 秒啃光） */
+function getDefenseBiteRate() {
+  if (game && game.mode === 'op') return OP_MODE_BITE_RATE;
+  return DEFENSE_TOWER_BITE_RATE;
+}
+
+function formatNumber(n) {
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + '万亿';
+  if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
+  if (n >= 1e4) return (n / 1e4).toFixed(2) + '万';
+  return String(Math.floor(n));
+}
+
+/* =========================================================
+   塔解锁判断
+   ========================================================= */
+function isTowerUnlocked(towerKey) {
+  if (!game) return true;
+
+  /* 防御炮台永久解锁 */
+  if (towerKey === 'defense') return true;
+
+  /* 炸弹、地雷：生存赛禁用 */
+  if (towerKey === 'suicide' || towerKey === 'mine') {
+    return game.mode !== 'defense';
+  }
+
+  /* 生存赛：不能建任何普通塔 */
+  if (game.mode === 'defense') return false;
+
+  /* 无尽 / 爽 / 塔限制 / 随机禁用：全塔解锁 */
+  if (game.mode === 'endless' || game.mode === 'op' || game.mode === 'limit' || game.mode === 'random') {
+    if ((game.mode === 'limit' || game.mode === 'random') &&
+        game.bannedTowers && game.bannedTowers.includes(towerKey)) return false;
+    return true;
+  }
+
+  /* 普通关卡：按解锁进度 */
+  for (let i = 0; i < game.level.id - 1; i++) {
+    const prev = LEVELS[i];
+    if (prev.unlockTower === towerKey) return true;
+  }
+  if (towerKey === 'arrow' || towerKey === 'cannon') return true;
+  return false;
+}
+
+/* 恶魔契约可用性（爽模式禁用） */
+function isDemonPactAvailable() {
+  if (!game) return false;
+  if (game.mode === 'defense') return false;
+  if (game.mode === 'op') return false;        /* 爽模式不需要契约 */
+  if (game.mode === 'endless') return true;
+  if (game.mode === 'limit' || game.mode === 'random') return true;
+  return game.level.id >= LEVELS.length - 2;
+}
+
+/* =========================================================
+   固定塔位置校验
+   ========================================================= */
+function ensureFixedTowersValid(level) {
+  const safe = [];
+  for (const cfg of level.fixedTowers) {
+    let x = cfg.x, y = cfg.y;
+    if (minDistToPath(x, y, level.path) < FIXED_TOWER_MIN_DIST) {
+      const step = 10;
+      let bestX = x, bestY = y, bestDist = minDistToPath(x, y, level.path);
+      for (let ox = -80; ox <= 80; ox += step) {
+        for (let oy = -80; oy <= 80; oy += step) {
+          const nx = x + ox, ny = y + oy;
+          if (nx < 24 || nx > W - 24 || ny < 24 || ny > H - 24) continue;
+          const d = minDistToPath(nx, ny, level.path);
+          if (d > bestDist) { bestDist = d; bestX = nx; bestY = ny; }
+        }
+      }
+      x = bestX; y = bestY;
+    }
+    safe.push({ x, y, type: cfg.type });
+  }
+  return safe;
+}
+
+/* =========================================================
+   主菜单渲染
+   ========================================================= */
+function renderLevelGrid() {
+  levelGridEl.innerHTML = '';
+  LEVELS.forEach(level => {
+    const unlocked = level.id <= progress.unlockedLevel;
+    const completed = !!progress.completed[level.id];
+    const card = document.createElement('button');
+    card.className = 'level-card' + (unlocked ? '' : ' locked');
+    card.dataset.levelId = level.id;
+
+    let unlockText = '';
+    if (level.unlockTower) {
+      const tDef = TOWER_TYPES[level.unlockTower];
+      if (completed) unlockText = `<span class="lc-unlock done">✓ 已解锁 ${tDef.icon} ${tDef.name}</span>`;
+      else unlockText = `<span class="lc-unlock">通关解锁 ${tDef.icon} ${tDef.name}</span>`;
+    } else if (completed) unlockText = `<span class="lc-unlock done">✓ 已通关</span>`;
+    else unlockText = `<span class="lc-unlock">最终关卡</span>`;
+
+    const starsStr = '★'.repeat(level.stars) + '☆'.repeat(6 - level.stars);
+    card.innerHTML = `
+      <span class="lc-num">LEVEL ${String(level.id).padStart(2, '0')}</span>
+      <span class="lc-name">${level.name}</span>
+      <span class="lc-desc">${level.desc}</span>
+      <span class="lc-row"><span class="lc-stars">${starsStr}</span>${unlockText}</span>
+    `;
+    if (unlocked) card.addEventListener('click', () => startLevel(level.id));
+    levelGridEl.appendChild(card);
+  });
+
+  if (progress.endlessBest > 0) endlessModeBtn.textContent = `∞ 无尽模式 · 最佳 ${progress.endlessBest} 波`;
+  else endlessModeBtn.textContent = '∞ 无尽模式';
+}
+
+/* =========================================================
+   无尽页面渲染
+   ========================================================= */
+function renderEndlessScreen() {
+  const best = progress.endlessBest;
+  const maxGold = progress.endlessMaxGold;
+  const saveInfo = getEndlessSaveInfo();
+
+  if (best > 0 || maxGold > 0) {
+    endlessRecordEl.innerHTML = `
+      <div class="er-title">🏆 历史最高记录</div>
+      <div class="er-stats">
+        <div class="er-stat"><span class="label">🌊 最高波数</span><span class="value">${best}</span></div>
+        <div class="er-stat"><span class="label">🪙 最高金币</span><span class="value small">${formatNumber(maxGold)}</span></div>
+      </div>
+    `;
+  } else {
+    endlessRecordEl.innerHTML = `
+      <div class="er-title">🏆 历史最高记录</div>
+      <div class="er-empty">还没有记录，快开始你的第一次挑战！</div>
+    `;
+  }
+
+  endlessActionsEl.innerHTML = '';
+  const newGameBtn = document.createElement('button');
+  newGameBtn.className = 'endless-action-btn primary';
+  newGameBtn.innerHTML = `<span class="ea-icon">🚀</span><span class="ea-info"><b>开始新一局</b><small>从第 1 波开始，怪物无穷无尽</small></span>`;
+  newGameBtn.addEventListener('click', () => {
+    if (saveInfo) {
+      if (!confirm('当前有一份存档，开始新一局会覆盖它，确定吗？')) return;
+      deleteEndlessSave();
+    }
+    startEndlessMode();
+  });
+  endlessActionsEl.appendChild(newGameBtn);
+
+  if (saveInfo) {
+    const timeStr = formatTimeAgo(saveInfo.savedAt);
+    const continueBtn = document.createElement('button');
+    continueBtn.className = 'endless-action-btn';
+    continueBtn.innerHTML = `<span class="ea-icon">📂</span><span class="ea-info"><b>继续存档</b><small>第 ${saveInfo.wave} 波 · 🪙${formatNumber(saveInfo.gold)} · ❤️${saveInfo.lives} · ${timeStr}</small></span>`;
+    continueBtn.addEventListener('click', () => {
+      const data = loadEndlessGame();
+      if (!data) { showToast('存档损坏或不存在'); return; }
+      const ok = restoreEndlessGame(data);
+      if (!ok) { showToast('读档失败'); return; }
+      showGameScreen();
+      overlayEl.classList.add('hidden');
+      towerPanelEl.classList.add('hidden');
+      lastPanelSig = '';
+      game.selectedTowerType = null;
+      buildShop(); updateShopUI(); updateTowerPanel(); updateHUD(); updateModeBanner();
+      maxWaveEl.textContent = '∞';
+      pauseMaskEl.classList.remove('hidden');
+      pauseBtn.textContent = '▶';
+      pauseBtn.classList.add('active');
+      sfxLoad();
+      showToast('📂 读档成功 · 第 ' + saveInfo.wave + ' 波', true);
+    });
+    endlessActionsEl.appendChild(continueBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'endless-action-btn danger';
+    deleteBtn.innerHTML = `<span class="ea-icon">🗑️</span><span class="ea-info"><b>删除存档</b><small>永久删除当前存档，无法恢复</small></span>`;
+    deleteBtn.addEventListener('click', () => {
+      if (confirm('确定要删除当前存档吗？此操作无法撤销。')) {
+        deleteEndlessSave();
+        renderEndlessScreen();
+        showToast('存档已删除', true);
+      }
+    });
+    endlessActionsEl.appendChild(deleteBtn);
+  }
+}
+
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return '未知时间';
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return mins + ' 分钟前';
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours + ' 小时前';
+  return Math.floor(hours / 24) + ' 天前';
+}
+
+/* =========================================================
+   更多模式页面渲染
+   ========================================================= */
+function renderModesList() {
+  modeListEl.innerHTML = '';
+
+  const modes = [
+    {
+      id: 'op', cls: 'op', icon: '🔥', name: '爽就完了',
+      desc: '塔 1 金币 · 自动满级 · 防御炮台 5000 血 · 伤害无限增长',
+      best: progress.opBest,
+      special: true
+    },
+    {
+      id: 'limit', cls: 'limit', icon: '🚫', name: '塔限制挑战',
+      desc: '开局随机禁用 3 座塔 · 全程锁定不变',
+      best: progress.limitBest
+    },
+    {
+      id: 'random', cls: 'random', icon: '🎲', name: '随机禁用塔',
+      desc: '每波随机禁用 3 座塔 · 动态变化',
+      best: progress.randomBest
+    },
+    {
+      id: 'defense', cls: 'defense', icon: '🛡️', name: '防御炮台生存赛',
+      desc: '只能建防御炮台，看你能撑到第几波。',
+      best: progress.defenseBest
+    }
+  ];
+
+  modes.forEach(mode => {
+    const card = document.createElement('div');
+    card.className = 'mode-card ' + mode.cls;
+
+    let bestStr = '';
+    if (mode.special) {
+      bestStr = mode.best > 0 ? `<br>🔥 最佳：第 ${mode.best} 波` : '';
+    } else if (mode.id === 'defense') {
+      bestStr = mode.best > 0 ? `<br>最佳：第 ${mode.best} 波` : '';
+    } else {
+      bestStr = mode.best > 0 ? `<br>最佳：第 ${mode.best} 波` : '';
+    }
+
+    card.innerHTML = `
+      <span class="mc-icon">${mode.icon}</span>
+      <span class="mc-info"><b>${mode.name}</b><small>${mode.desc}${bestStr}</small></span>
+      <span class="mc-status">${mode.special ? '开爽' : '开始'}</span>
+    `;
+    card.addEventListener('click', () => startSpecialMode(mode.id));
+    modeListEl.appendChild(card);
+  });
+}
+
+/* =========================================================
+   界面切换
+   ========================================================= */
+function showMenu() {
+  currentScreen = 'menu';
+  menuScreenEl.classList.remove('hidden');
+  endlessScreenEl.classList.add('hidden');
+  modesScreenEl.classList.add('hidden');
+  gameScreenEl.classList.add('hidden');
+  game = null;
+  pauseMaskEl.classList.add('hidden');
+  modeBannerEl.classList.remove('visible');
+  renderLevelGrid();
+}
+
+function showEndlessScreen() {
+  currentScreen = 'endless';
+  menuScreenEl.classList.add('hidden');
+  endlessScreenEl.classList.remove('hidden');
+  modesScreenEl.classList.add('hidden');
+  gameScreenEl.classList.add('hidden');
+  game = null;
+  pauseMaskEl.classList.add('hidden');
+  renderEndlessScreen();
+}
+
+function showModesScreen() {
+  currentScreen = 'modes';
+  menuScreenEl.classList.add('hidden');
+  endlessScreenEl.classList.add('hidden');
+  modesScreenEl.classList.remove('hidden');
+  gameScreenEl.classList.add('hidden');
+  game = null;
+  renderModesList();
+}
+
+function showGameScreen() {
+  currentScreen = 'game';
+  menuScreenEl.classList.add('hidden');
+  endlessScreenEl.classList.add('hidden');
+  modesScreenEl.classList.add('hidden');
+  gameScreenEl.classList.remove('hidden');
+}
+
+/* =========================================================
+   模式提示条
+   ========================================================= */
+function updateModeBanner() {
+  if (!game) {
+    modeBannerEl.classList.remove('visible');
+    modeBannerEl.className = 'mode-banner';
+    return;
+  }
+
+  if (game.mode === 'op') {
+    modeBannerEl.className = 'mode-banner op visible';
+    modeBannerEl.innerHTML = `<span class="banned-icon">🔥</span> 爽就完了 · 塔 1 金币 · 自动满级 · 防御炮台 ${OP_MODE_DEFENSE_HP} 血 · 伤害随波数暴增`;
+  } else if (game.mode === 'limit') {
+    if (game.bannedTowers && game.bannedTowers.length > 0) {
+      const banned = game.bannedTowers.map(k => {
+        const d = TOWER_TYPES[k];
+        return `<span class="banned-tag">${d.icon} ${d.name}</span>`;
+      }).join('');
+      modeBannerEl.className = 'mode-banner limit visible';
+      modeBannerEl.innerHTML = `<span class="banned-icon">🚫</span> 本局锁定禁用： ${banned}`;
+    } else {
+      modeBannerEl.className = 'mode-banner limit visible';
+      modeBannerEl.innerHTML = `<span class="banned-icon">🚫</span> 随机中…`;
+    }
+  } else if (game.mode === 'random') {
+    if (game.bannedTowers && game.bannedTowers.length > 0) {
+      const banned = game.bannedTowers.map(k => {
+        const d = TOWER_TYPES[k];
+        return `<span class="banned-tag">${d.icon} ${d.name}</span>`;
+      }).join('');
+      modeBannerEl.className = 'mode-banner random visible';
+      modeBannerEl.innerHTML = `<span class="banned-icon">🎲</span> 本波禁用： ${banned}`;
+    } else {
+      modeBannerEl.className = 'mode-banner random visible';
+      modeBannerEl.innerHTML = `<span class="banned-icon">🎲</span> 随机中…`;
+    }
+  } else if (game.mode === 'defense') {
+    modeBannerEl.className = 'mode-banner defense visible';
+    modeBannerEl.innerHTML = `<span class="banned-icon">🛡️</span> 防御炮台生存赛 · 只能建防御炮台 · 每波奖励 +${DEFENSE_MODE_WAVE_BONUS} 金币`;
+  } else {
+    modeBannerEl.classList.remove('visible');
+    modeBannerEl.className = 'mode-banner';
+  }
+}
+
+/* =========================================================
+   开始关卡 / 无尽 / 特殊模式
+   ========================================================= */
+function startLevel(levelId) {
+  const level = LEVELS.find(l => l.id === levelId);
+  if (!level) return;
+  game = createGameState(level, 'normal');
+  game.towers = createFixedTowers(level);
+  pointerDownPos = null; pointerDownTime = 0;
+  showGameScreen();
+  overlayEl.classList.add('hidden');
+  towerPanelEl.classList.add('hidden');
+  pauseMaskEl.classList.add('hidden');
+  lastPanelSig = '';
+  game.selectedTowerType = null;
+  updateSpeedButton();
+  buildShop(); updateShopUI(); updateTowerPanel(); updateHUD(); updateModeBanner();
+  maxWaveEl.textContent = level.waveCount;
+}
+
+function startEndlessMode() {
+  const baseLevel = LEVELS.find(l => l.id === 6);
+  if (!baseLevel) return;
+  const endlessLevel = {
+    id: 999, name: '无尽模式', desc: '怪物无穷无尽', stars: 6,
+    path: baseLevel.path, startGold: 300, upgradeMult: 1.6, damageMult: 0.9,
+    waveCount: Infinity, hpMult: 1.4, speedMult: 1.1, rewardMult: 1.0,
+    fixedTowers: baseLevel.fixedTowers, unlockTower: null
+  };
+  game = createGameState(endlessLevel, 'endless');
+  game.towers = createFixedTowers(endlessLevel);
+  pointerDownPos = null; pointerDownTime = 0;
+  showGameScreen();
+  overlayEl.classList.add('hidden');
+  towerPanelEl.classList.add('hidden');
+  pauseMaskEl.classList.add('hidden');
+  lastPanelSig = '';
+  game.selectedTowerType = null;
+  updateSpeedButton();
+  buildShop(); updateShopUI(); updateTowerPanel(); updateHUD(); updateModeBanner();
+  maxWaveEl.textContent = '∞';
+  showToast('∞ 无尽模式开始！', true);
+}
+
+function startSpecialMode(modeId) {
+  if (modeId === 'op') {
+    /* 爽就完了模式 */
+    const baseLevel = LEVELS.find(l => l.id === 6);
+    if (!baseLevel) return;
+    const opLevel = {
+      id: 997, name: '爽就完了', desc: '塔 1 金币 · 自动满级', stars: 6,
+      path: baseLevel.path, startGold: 999, upgradeMult: 1.0, damageMult: 1.0,
+      waveCount: Infinity, hpMult: 1.4, speedMult: 1.1, rewardMult: 1.0,
+      fixedTowers: baseLevel.fixedTowers, unlockTower: null
+    };
+    game = createGameState(opLevel, 'op');
+    game.lives = OP_MODE_START_LIVES;
+    game.towers = createFixedTowers(opLevel);
+    /* 固定塔也自动满级 */
+    for (const t of game.towers) { t.dmgLvl = MAX_LEVEL; t.rateLvl = MAX_LEVEL; }
+    pointerDownPos = null; pointerDownTime = 0;
+    showGameScreen();
+    overlayEl.classList.add('hidden');
+    towerPanelEl.classList.add('hidden');
+    pauseMaskEl.classList.add('hidden');
+    lastPanelSig = '';
+    game.selectedTowerType = null;
+    updateSpeedButton();
+    buildShop(); updateShopUI(); updateTowerPanel(); updateHUD(); updateModeBanner();
+    maxWaveEl.textContent = '∞';
+    showToast('🔥 爽就完了！所有塔 1 金币，建造即满级', true);
+    return;
+  }
+
+  if (modeId === 'limit' || modeId === 'random') {
+    const levelId = Math.min(progress.unlockedLevel, LEVELS.length);
+    const level = LEVELS.find(l => l.id === levelId);
+    if (!level) return;
+    game = createGameState(level, modeId);
+    game.towers = createFixedTowers(level);
+    pointerDownPos = null; pointerDownTime = 0;
+    showGameScreen();
+    overlayEl.classList.add('hidden');
+    towerPanelEl.classList.add('hidden');
+    pauseMaskEl.classList.add('hidden');
+    lastPanelSig = '';
+    game.selectedTowerType = null;
+    rollBannedTowers();
+    updateSpeedButton();
+    buildShop(); updateShopUI(); updateTowerPanel(); updateHUD(); updateModeBanner();
+    maxWaveEl.textContent = level.waveCount;
+    showToast(modeId === 'limit' ? '🚫 塔限制挑战开始！' : '🎲 随机禁用塔开始！', true);
+  } else if (modeId === 'defense') {
+    const baseLevel = LEVELS.find(l => l.id === 6);
+    if (!baseLevel) return;
+    const defenseLevel = {
+      id: 998, name: '防御炮台生存赛', desc: '只能建防御炮台', stars: 6,
+      path: baseLevel.path,
+      startGold: DEFENSE_MODE_START_GOLD,
+      upgradeMult: 1.6, damageMult: 0.9,
+      waveCount: Infinity, hpMult: 1.4, speedMult: 1.1, rewardMult: 1.0,
+      fixedTowers: baseLevel.fixedTowers, unlockTower: null
+    };
+    game = createGameState(defenseLevel, 'defense');
+    game.lives = DEFENSE_MODE_START_LIVES;
+    game.towers = createFixedTowers(defenseLevel);
+    pointerDownPos = null; pointerDownTime = 0;
+    showGameScreen();
+    overlayEl.classList.add('hidden');
+    towerPanelEl.classList.add('hidden');
+    pauseMaskEl.classList.add('hidden');
+    lastPanelSig = '';
+    game.selectedTowerType = null;
+    updateSpeedButton();
+    buildShop(); updateShopUI(); updateTowerPanel(); updateHUD(); updateModeBanner();
+    maxWaveEl.textContent = '∞';
+    showToast('🛡️ 防御炮台生存赛开始！', true);
+  }
+}
+
+/* =========================================================
+   创建游戏状态
+   ========================================================= */
+function createGameState(level, mode) {
+  return {
+    level, mode: mode || 'normal',
+    isEndless: mode === 'endless',
+    state: 'playing',
+    lives: mode === 'defense' ? DEFENSE_MODE_START_LIVES :
+           mode === 'op' ? OP_MODE_START_LIVES : 20,
+    gold: level.startGold,
+    wave: 0, time: 0,
+    enemies: [], towers: [], defenses: [], suicideCannons: [], mines: [],
+    projectiles: [], particles: [], beams: [], damageNumbers: [],
+    spawnQueue: [], spawnTimer: 0, spawnInterval: 1,
+    waveActive: false, betweenTimer: 6,
+    selectedTowerType: null, selectedTower: null, selectedDefense: null,
+    selectedSuicide: null, selectedMine: null, mouse: null,
+    demonPactUsed: false, demonPactTimer: 0,
+    bannedTowers: []
+  };
+}
+
+function createFixedTowers(level) {
+  const list = [];
+  const safeTowers = ensureFixedTowersValid(level);
+  for (const cfg of safeTowers) {
+    list.push({
+      x: cfg.x, y: cfg.y, type: cfg.type,
+      dmgLvl: 1, rateLvl: 1, cooldown: 0,
+      angle: -Math.PI / 2, invested: 0, fixed: true
+    });
+  }
+  return list;
+}
+
+/* =========================================================
+   随机禁用塔（箭塔永不禁）
+   ========================================================= */
+function rollBannedTowers() {
+  if (!game) return;
+  if (game.mode !== 'random' && game.mode !== 'limit') return;
+
+  const all = Object.keys(TOWER_TYPES);
+  /* 箭塔永远保留（唯一 50 金币基础塔），从剩下 5 座里随机禁 */
+  const pool = all.filter(k => k !== 'arrow');
+  const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+  game.bannedTowers = shuffled.slice(0, BANNED_COUNT);
+
+  buildShop();
+  updateShopUI();
+  updateModeBanner();
+}
+
+/* =========================================================
+   波次配置
+   ========================================================= */
+const WAVE_COLORS = ['#f87171','#fb923c','#facc15','#a3e635','#34d399','#22d3ee','#818cf8','#e879f9','#f472b6','#94a3b8'];
+
+function waveConfig(w) {
+  const level = game.level;
+  const baseWaveCount = 12;
+  let hp, speed, reward;
+
+  if (isInfiniteMode() && w > baseWaveCount) {
+    const extraWaves = w - baseWaveCount;
+    const hpBase12 = 24 * Math.pow(1.35, baseWaveCount - 1) * level.hpMult;
+    const spdBase12 = (52 + baseWaveCount * 3) * level.speedMult;
+    const rwBase12 = (4 + baseWaveCount * 1.8) * level.rewardMult;
+    hp = Math.round(hpBase12 * Math.pow(ENDLESS_HP_GROWTH, extraWaves));
+    speed = spdBase12 + extraWaves * ENDLESS_SPD_GROWTH * level.speedMult;
+    reward = Math.round(rwBase12 + extraWaves * ENDLESS_REWARD_GROWTH * level.rewardMult);
+  } else {
+    hp = Math.round(24 * Math.pow(1.35, w - 1) * level.hpMult);
+    speed = (52 + w * 3) * level.speedMult;
+    reward = Math.round((4 + w * 1.8) * level.rewardMult);
+  }
+
+  return {
+    count: 6 + w * 2,
+    hp, speed, reward,
+    interval: Math.max(0.4, 0.95 - w * 0.04),
+    boss: w % 5 === 0,
+    color: WAVE_COLORS[(w - 1) % WAVE_COLORS.length]
+  };
+}
+
+function startWave() {
+  game.wave++;
+
+  if (game.mode === 'random') {
+    rollBannedTowers();
+  }
+
+  const cfg = waveConfig(game.wave);
+  game.spawnQueue = [];
+  for (let i = 0; i < cfg.count; i++) {
+    game.spawnQueue.push({ hp: cfg.hp, speed: cfg.speed, reward: cfg.reward, boss: false, color: cfg.color });
+  }
+  if (cfg.boss) {
+    game.spawnQueue.push({ hp: cfg.hp * 7, speed: cfg.speed * 0.55, reward: cfg.reward * 10, boss: true, color: '#ef4444' });
+  }
+  game.spawnTimer = 0;
+  game.spawnInterval = cfg.interval;
+  game.waveActive = true;
+  sfxWaveStart();
+}
+
+/* =========================================================
+   生成 / 更新怪物
+   ========================================================= */
+function spawnEnemy(cfg) {
+  const path = game.level.path;
+  game.enemies.push({
+    x: path[0].x, y: path[0].y, wp: 1,
+    hp: cfg.hp, maxHp: cfg.hp,
+    speed: cfg.speed, reward: cfg.reward,
+    radius: cfg.boss ? 22 : 13,
+    color: cfg.color, boss: cfg.boss,
+    slowTimer: 0, slowAmount: 0, poisonTimer: 0, poisonDps: 0,
+    distTraveled: 0, dead: false, reachedEnd: false, bitingDefense: null
+  });
+}
+
+function findBlockingDefense(e) {
+  for (const d of game.defenses) {
+    if (d.dead) continue;
+    if (Math.hypot(e.x - d.x, e.y - d.y) < DEFENSE_TOWER_BITE_RANGE) return d;
+  }
+  return null;
+}
+
+function updateEnemy(e, dt) {
+  if (e.slowTimer > 0) e.slowTimer -= dt;
+  const iceSlow = e.slowTimer > 0 ? e.slowAmount : 0;
+  const poisonSlow = e.poisonTimer > 0 ? POISON_SLOW : 0;
+  const mult = 1 - Math.max(iceSlow, poisonSlow);
+
+  if (e.poisonTimer > 0) {
+    e.poisonTimer -= dt;
+    e.hp -= e.poisonDps * dt;
+    if (e.hp <= 0 && !e.dead) {
+      e.dead = true;
+      game.gold += e.reward;
+      spawnParticles(e.x, e.y, '#a3e635', e.boss ? 26 : 12);
+      return;
+    }
+  }
+
+  const blocker = findBlockingDefense(e);
+  e.bitingDefense = blocker;
+  if (blocker) return;
+
+  let move = e.speed * mult * dt;
+  e.distTraveled += move;
+  const path = game.level.path;
+  while (move > 0 && e.wp < path.length) {
+    const t = path[e.wp];
+    const dx = t.x - e.x, dy = t.y - e.y;
+    const d = Math.hypot(dx, dy);
+    if (d <= move) { e.x = t.x; e.y = t.y; e.wp++; move -= d; }
+    else { e.x += dx / d * move; e.y += dy / d * move; move = 0; }
+  }
+  if (e.wp >= path.length) e.reachedEnd = true;
+}
+
+/* =========================================================
+   伤害 / 粒子 / 飘字
+   ========================================================= */
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 40 + Math.random() * 120;
+    game.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.45 + Math.random() * 0.35, maxLife: 0.8, color, size: 1.5 + Math.random() * 2.5 });
+  }
+}
+
+function spawnExplosion(x, y) {
+  for (let i = 0; i < 45; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 90 + Math.random() * 300;
+    game.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.55 + Math.random() * 0.5, maxLife: 1.05, color: Math.random() < 0.5 ? '#ef4444' : '#fb923c', size: 2 + Math.random() * 4 });
+  }
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 100 + Math.random() * 220;
+    game.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.3 + Math.random() * 0.3, maxLife: 0.6, color: '#fef2f2', size: 3 + Math.random() * 3 });
+  }
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 50 + Math.random() * 150;
+    game.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.7 + Math.random() * 0.4, maxLife: 1.1, color: '#7f1d1d', size: 4 + Math.random() * 3 });
+  }
+}
+
+function spawnDamageNumber(x, y, dmg) {
+  if (dmg < 15) return;
+  /* 爽模式：伤害数字更大更亮 */
+  const isOp = game && game.mode === 'op';
+  game.damageNumbers.push({
+    x: x + (Math.random() - 0.5) * 12, y: y - 8,
+    value: Math.round(dmg), life: isOp ? 0.9 : 0.7, maxLife: isOp ? 0.9 : 0.7,
+    vx: (Math.random() - 0.5) * 25, vy: -55 - Math.random() * 20,
+    color: dmg >= 100 ? '#fbbf24' : dmg >= 50 ? '#f97316' : '#ffffff',
+    size: dmg >= 1000 ? 20 : dmg >= 100 ? 15 : dmg >= 50 ? 13 : 11
+  });
+}
+
+function damageEnemy(e, dmg) {
+  if (e.dead) return;
+  e.hp -= dmg;
+  spawnDamageNumber(e.x, e.y, dmg);
+  if (e.hp <= 0) {
+    e.dead = true;
+    game.gold += e.reward;
+    spawnParticles(e.x, e.y, e.color, e.boss ? 26 : 10);
+  }
+}
+
+/* =========================================================
+   防御塔逻辑
+   ========================================================= */
+function findTarget(t) {
+  const range = TOWER_TYPES[t.type].range;
+  let best = null, bestScore = -Infinity;
+  for (const e of game.enemies) {
+    if (e.dead || e.reachedEnd) continue;
+    const d = Math.hypot(e.x - t.x, e.y - t.y);
+    if (d > range + e.radius) continue;
+    let score = e.distTraveled;
+    if (e.bitingDefense && !e.bitingDefense.dead) score += 1e6;
+    if (score > bestScore) { bestScore = score; best = e; }
+  }
+  return best;
+}
+
+function shoot(t, target) {
+  const def = TOWER_TYPES[t.type];
+  t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+  if (settings.soundEnabled) {
+    if (t.type === 'arrow') sfxArrow();
+    else if (t.type === 'cannon') sfxCannon();
+    else if (t.type === 'frost') sfxFrost();
+    else if (t.type === 'sniper') sfxSniper();
+    else if (t.type === 'laser') sfxLaser();
+    else if (t.type === 'poison') sfxPoison();
+  }
+  if (t.type === 'laser') {
+    game.beams.push({ x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 0.16, maxLife: 0.16, color: '#f472b6', width: 3 });
+    damageEnemy(target, towerDamage(t));
+    spawnParticles(target.x, target.y, '#fbcfe8', 3);
+    return;
+  }
+  if (t.type === 'sniper') {
+    game.beams.push({ x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 0.22, maxLife: 0.22, color: '#c084fc', width: 7 });
+    spawnParticles(t.x, t.y, '#e9d5ff', 5);
+  }
+  const speed = t.type === 'sniper' ? 950 : t.type === 'cannon' ? 330 : 580;
+  game.projectiles.push({
+    x: t.x, y: t.y, target, speed,
+    damage: towerDamage(t),
+    splash: def.splash || 0,
+    slow: def.slow || 0, slowDur: def.slowDur || 0,
+    poisonDmg: def.poisonDmg || 0, poisonDur: def.poisonDur || 0,
+    color: def.color,
+    radius: t.type === 'cannon' ? 5 : 3,
+    isSniper: t.type === 'sniper', isPoison: t.type === 'poison'
+  });
+}
+
+function applyHit(p) {
+  if (p.splash > 0) {
+    for (const e of game.enemies) {
+      if (e.dead || e.reachedEnd) continue;
+      if (Math.hypot(e.x - p.x, e.y - p.y) <= p.splash) {
+        damageEnemy(e, p.damage);
+        if (!e.dead) {
+          if (p.slow > 0) { e.slowTimer = p.slowDur; e.slowAmount = p.slow; }
+          if (p.poisonDmg > 0) {
+            e.poisonTimer = Math.max(e.poisonTimer || 0, p.poisonDur);
+            e.poisonDps = Math.max(e.poisonDps || 0, p.poisonDmg);
+          }
+        }
+      }
+    }
+    spawnParticles(p.x, p.y, '#fb923c', 14);
+  } else {
+    if (p.target && !p.target.dead) {
+      damageEnemy(p.target, p.damage);
+      if (!p.target.dead) {
+        if (p.slow > 0) { p.target.slowTimer = p.slowDur; p.target.slowAmount = p.slow; }
+        if (p.poisonDmg > 0) {
+          p.target.poisonTimer = Math.max(p.target.poisonTimer || 0, p.poisonDur);
+          p.target.poisonDps = Math.max(p.target.poisonDps || 0, p.poisonDmg);
+        }
+      }
+    }
+    if (p.isSniper) { spawnParticles(p.x, p.y, '#e9d5ff', 12); spawnParticles(p.x, p.y, '#c084fc', 8); }
+    else if (p.isPoison) spawnParticles(p.x, p.y, '#a3e635', 6);
+    else spawnParticles(p.x, p.y, p.color, 4);
+  }
+}
+
+/* =========================================================
+   建造 / 升级 / 出售
+   ========================================================= */
+function canPlaceNormal(x, y) {
+  if (x < 24 || x > W - 24 || y < 24 || y > H - 24) return false;
+  if (minDistToPath(x, y, game.level.path) < 40) return false;
+  for (const t of game.towers) if (Math.hypot(t.x - x, t.y - y) < 38) return false;
+  for (const d of game.defenses) if (Math.hypot(d.x - x, d.y - y) < 38) return false;
+  for (const s of game.suicideCannons) if (Math.hypot(s.x - x, s.y - y) < 38) return false;
+  for (const m of game.mines) if (Math.hypot(m.x - x, m.y - y) < 38) return false;
+  return true;
+}
+
+function canPlaceDefense(x, y) {
+  if (x < 24 || x > W - 24 || y < 24 || y > H - 24) return false;
+  if (minDistToPath(x, y, game.level.path) > DEFENSE_TOWER_PATH_DIST) return false;
+  for (const t of game.towers) if (Math.hypot(t.x - x, t.y - y) < 34) return false;
+  for (const d of game.defenses) if (Math.hypot(d.x - x, d.y - y) < 34) return false;
+  for (const s of game.suicideCannons) if (Math.hypot(s.x - x, s.y - y) < 34) return false;
+  for (const m of game.mines) if (Math.hypot(m.x - x, m.y - y) < 34) return false;
+  return true;
+}
+
+function canPlaceSuicide(x, y) {
+  if (x < 24 || x > W - 24 || y < 24 || y > H - 24) return false;
+  for (const t of game.towers) if (Math.hypot(t.x - x, t.y - y) < 38) return false;
+  for (const d of game.defenses) if (Math.hypot(d.x - x, d.y - y) < 38) return false;
+  for (const s of game.suicideCannons) if (Math.hypot(s.x - x, s.y - y) < 38) return false;
+  for (const m of game.mines) if (Math.hypot(m.x - x, m.y - y) < 38) return false;
+  return true;
+}
+
+function canPlaceMine(x, y) {
+  if (x < 24 || x > W - 24 || y < 24 || y > H - 24) return false;
+  for (const t of game.towers) if (Math.hypot(t.x - x, t.y - y) < 32) return false;
+  for (const d of game.defenses) if (Math.hypot(d.x - x, d.y - y) < 32) return false;
+  for (const s of game.suicideCannons) if (Math.hypot(s.x - x, s.y - y) < 32) return false;
+  for (const m of game.mines) if (Math.hypot(m.x - x, m.y - y) < 28) return false;
+  return true;
+}
+
+function tryPlace(x, y) {
+  const key = game.selectedTowerType;
+  if (!key) return;
+  const cost = getTowerCost(key);
+
+  if (key === 'defense') {
+    if (game.gold < cost) { showToast('金币不足！'); return; }
+    if (!canPlaceDefense(x, y)) { showToast('防御炮台只能建在路径上'); return; }
+    game.gold -= cost;
+    const hp = getDefenseMaxHp();
+    game.defenses.push({ x, y, hp: hp, maxHp: hp, bitten: false, dead: false, invested: cost });
+    spawnParticles(x, y, '#94a3b8', 15);
+    spawnParticles(x, y, '#cbd5e1', 8);
+    sfxPlaceDefense();
+    game.selectedTowerType = null;
+    updateShopUI();
+    return;
+  }
+
+  if (key === 'suicide') {
+    if (game.gold < cost) { showToast('金币不足！'); return; }
+    if (!canPlaceSuicide(x, y)) { showToast('此处无法建造'); return; }
+    game.gold -= cost;
+    game.suicideCannons.push({ x, y, countdown: SUICIDE_CANNON_COUNTDOWN, exploded: false, invested: cost, lastCountdownInt: SUICIDE_CANNON_COUNTDOWN });
+    spawnParticles(x, y, '#ef4444', 15);
+    spawnParticles(x, y, '#fb923c', 10);
+    sfxPlaceSuicide();
+    game.selectedTowerType = null;
+    updateShopUI();
+    return;
+  }
+
+  if (key === 'mine') {
+    if (game.gold < cost) { showToast('金币不足！'); return; }
+    if (!canPlaceMine(x, y)) { showToast('此处无法放置'); return; }
+    game.gold -= cost;
+    game.mines.push({ x, y, exploded: false, invested: cost });
+    spawnParticles(x, y, '#f97316', 12);
+    spawnParticles(x, y, '#fbbf24', 6);
+    sfxPlaceMine();
+    game.selectedTowerType = null;
+    updateShopUI();
+    return;
+  }
+
+  const def = TOWER_TYPES[key];
+  if (!isTowerUnlocked(key)) {
+    if (game.mode === 'random' || game.mode === 'limit') showToast('本波此塔被禁用');
+    else showToast('该塔尚未解锁');
+    return;
+  }
+  if (game.mode === 'defense') { showToast('生存赛只能建防御炮台'); return; }
+  if (game.gold < cost) { showToast('金币不足！'); return; }
+  if (!canPlaceNormal(x, y)) { showToast('此处无法建造'); return; }
+
+  game.gold -= cost;
+  /* 爽模式：建造即满级 */
+  const isOp = game.mode === 'op';
+  game.towers.push({
+    x, y, type: key,
+    dmgLvl: isOp ? MAX_LEVEL : 1,
+    rateLvl: isOp ? MAX_LEVEL : 1,
+    cooldown: 0, angle: -Math.PI / 2,
+    invested: cost, fixed: false
+  });
+  spawnParticles(x, y, def.color, isOp ? 20 : 10);
+  sfxPlaceTower();
+  game.selectedTowerType = null;
+  updateShopUI();
+}
+
+function doUpgrade(t, kind) {
+  /* 爽模式不用升级 */
+  if (game.mode === 'op') { showToast('爽模式：塔已经是满级了'); return; }
+  const cost = upgradeCost(t, kind);
+  if (game.gold < cost) { showToast('金币不足！'); return; }
+  const lvl = kind === 'dmg' ? t.dmgLvl : t.rateLvl;
+  if (lvl >= MAX_LEVEL) return;
+  game.gold -= cost;
+  t.invested += cost;
+  if (kind === 'dmg') t.dmgLvl++; else t.rateLvl++;
+  spawnParticles(t.x, t.y, '#fbbf24', 10);
+  sfxUpgrade();
+  lastPanelSig = '';
+}
+
+function sellTower(t) {
+  if (t.fixed) { showToast('城堡固定塔无法出售'); return; }
+  const refund = Math.floor(t.invested * 0.6);
+  game.gold += refund;
+  game.towers = game.towers.filter(x => x !== t);
+  game.selectedTower = null;
+  lastPanelSig = '';
+  sfxSell();
+  showToast('已出售，返还 🪙' + refund, true);
+}
+
+function sellDefense(d) {
+  if (d.bitten) { showToast('已被啃咬，无法出售'); return; }
+  const refund = Math.floor(d.invested * DEFENSE_TOWER_SELL_RATIO);
+  game.gold += refund;
+  game.defenses = game.defenses.filter(x => x !== d);
+  game.selectedDefense = null;
+  lastPanelSig = '';
+  sfxSell();
+  showToast('已出售，返还 🪙' + refund, true);
+}
+
+function sellMine(m) {
+  if (m.exploded) { showToast('地雷已经爆炸'); return; }
+  const refund = Math.floor(m.invested * 0.5);
+  game.gold += refund;
+  game.mines = game.mines.filter(x => x !== m);
+  game.selectedMine = null;
+  lastPanelSig = '';
+  sfxSell();
+  showToast('已拆除，返还 🪙' + refund, true);
+}
+
+function useDemonPact(sourceTower) {
+  if (!isDemonPactAvailable()) { showToast('该模式无法使用恶魔契约'); return; }
+  if (game.demonPactUsed) { showToast('恶魔契约已经用过了'); return; }
+  if (game.gold < DEMON_PACT_COST) { showToast('金币不足！'); return; }
+  game.gold -= DEMON_PACT_COST;
+  game.demonPactUsed = true;
+  game.demonPactTimer = DEMON_PACT_DURATION;
+  for (const tower of game.towers) {
+    tower.demonOriginalDmg = tower.dmgLvl;
+    tower.demonOriginalRate = tower.rateLvl;
+    tower.dmgLvl = MAX_LEVEL;
+    tower.rateLvl = MAX_LEVEL;
+    spawnParticles(tower.x, tower.y, '#ef4444', 12);
+    spawnParticles(tower.x, tower.y, '#f97316', 8);
+  }
+  spawnParticles(sourceTower.x, sourceTower.y, '#ef4444', 30);
+  spawnParticles(sourceTower.x, sourceTower.y, '#7f1d1d', 20);
+  sfxDemon();
+  showToast('😈 恶魔契约生效！全塔满级 10 秒', true);
+  lastPanelSig = '';
+}
+
+/* =========================================================
+   暂停 / 倍速 / 音效
+   ========================================================= */
+function togglePause() {
+  if (!game || game.state === 'won' || game.state === 'lost') return;
+  if (game.state === 'playing') {
+    game.state = 'paused';
+    pauseMaskEl.classList.remove('hidden');
+    pauseBtn.textContent = '▶';
+    pauseBtn.classList.add('active');
+  } else if (game.state === 'paused') {
+    game.state = 'playing';
+    pauseMaskEl.classList.add('hidden');
+    pauseBtn.textContent = '⏸';
+    pauseBtn.classList.remove('active');
+  }
+}
+
+function toggleSpeed() {
+  settings.speedMultiplier = settings.speedMultiplier === 1 ? 2 : 1;
+  saveSettings();
+  updateSpeedButton();
+}
+
+function updateSpeedButton() {
+  speedBtn.textContent = settings.speedMultiplier + '×';
+  if (settings.speedMultiplier === 2) speedBtn.classList.add('active');
+  else speedBtn.classList.remove('active');
+}
+
+function toggleSound() {
+  settings.soundEnabled = !settings.soundEnabled;
+  saveSettings();
+  if (settings.soundEnabled) {
+    soundBtn.textContent = '🔊';
+    soundBtn.classList.remove('muted');
+    ensureAudio();
+    setTimeout(() => playTone(800, 0.1, 'sine', 0.5), 50);
+  } else {
+    soundBtn.textContent = '🔇';
+    soundBtn.classList.add('muted');
+  }
+}
+
+function updateSoundButton() {
+  if (settings.soundEnabled) {
+    soundBtn.textContent = '🔊';
+    soundBtn.classList.remove('muted');
+  } else {
+    soundBtn.textContent = '🔇';
+    soundBtn.classList.add('muted');
+  }
+}
+
+/* =========================================================
+   主更新
+   ========================================================= */
+function update(dt) {
+  if (!game || game.state !== 'playing') return;
+  game.time += dt;
+
+  if (game.demonPactTimer > 0) {
+    game.demonPactTimer -= dt;
+    if (game.demonPactTimer <= 0) {
+      game.demonPactTimer = 0;
+      for (const tower of game.towers) {
+        if (tower.demonOriginalDmg !== undefined) {
+          tower.dmgLvl = tower.demonOriginalDmg;
+          tower.rateLvl = tower.demonOriginalRate;
+          delete tower.demonOriginalDmg;
+          delete tower.demonOriginalRate;
+          spawnParticles(tower.x, tower.y, '#64748b', 10);
+        }
+      }
+      showToast('恶魔契约结束', true);
+      lastPanelSig = '';
+    }
+  }
+
+  if (game.waveActive) {
+    if (game.spawnQueue.length > 0) {
+      game.spawnTimer -= dt;
+      if (game.spawnTimer <= 0) {
+        spawnEnemy(game.spawnQueue.shift());
+        game.spawnTimer = game.spawnInterval;
+      }
+    } else if (game.enemies.length === 0) {
+      game.waveActive = false;
+      if (game.mode === 'defense') {
+        game.gold += DEFENSE_MODE_WAVE_BONUS;
+        showToast('本波结束 · 奖励 🪙' + DEFENSE_MODE_WAVE_BONUS, true);
+      }
+      if (isInfiniteMode()) {
+        game.betweenTimer = game.mode === 'op' ? 2 : 3;
+      } else if (game.wave >= game.level.waveCount) {
+        game.state = 'won';
+        onLevelComplete();
+        sfxWin();
+        showOverlay(true);
+        return;
+      } else {
+        game.betweenTimer = 4;
+      }
+    }
+  } else {
+    game.betweenTimer -= dt;
+    if (game.betweenTimer <= 0) startWave();
+  }
+
+  for (const e of game.enemies) if (!e.dead) updateEnemy(e, dt);
+
+  for (const m of game.mines) {
+    if (m.exploded) continue;
+    let triggered = false;
+    for (const e of game.enemies) {
+      if (e.dead || e.reachedEnd) continue;
+      if (Math.hypot(e.x - m.x, e.y - m.y) < MINE_TRIGGER_RADIUS + e.radius) {
+        triggered = true;
+        break;
+      }
+    }
+    if (triggered) {
+      m.exploded = true;
+      for (const e of game.enemies) {
+        if (e.dead || e.reachedEnd) continue;
+        if (Math.hypot(e.x - m.x, e.y - m.y) <= MINE_RADIUS) damageEnemy(e, MINE_DAMAGE);
+      }
+      spawnExplosion(m.x, m.y);
+      sfxMineTrigger();
+    }
+  }
+
+  const hadMine = game.mines.length;
+  game.mines = game.mines.filter(m => !m.exploded);
+  if (game.mines.length !== hadMine && game.selectedMine && game.selectedMine.exploded) {
+    game.selectedMine = null;
+    lastPanelSig = '';
+  }
+
+  const biteRate = getDefenseBiteRate();
+  for (const d of game.defenses) {
+    if (d.dead) continue;
+    let hasBiter = false;
+    for (const e of game.enemies) {
+      if (e.dead || e.reachedEnd) continue;
+      if (Math.hypot(e.x - d.x, e.y - d.y) < DEFENSE_TOWER_BITE_RANGE) { hasBiter = true; break; }
+    }
+    if (hasBiter) {
+      d.hp -= biteRate * dt;
+      d.bitten = true;
+      if (Math.random() < dt * 6) {
+        spawnParticles(d.x + (Math.random() - 0.5) * 20, d.y + (Math.random() - 0.5) * 20, '#f87171', 2);
+      }
+      if (d.hp <= 0) {
+        d.hp = 0;
+        d.dead = true;
+        spawnParticles(d.x, d.y, '#94a3b8', 25);
+        spawnParticles(d.x, d.y, '#64748b', 15);
+        spawnParticles(d.x, d.y, '#f87171', 10);
+      }
+    }
+  }
+
+  const hadDefense = game.defenses.length;
+  game.defenses = game.defenses.filter(d => !d.dead);
+  if (game.defenses.length !== hadDefense && game.selectedDefense && game.selectedDefense.dead) {
+    game.selectedDefense = null;
+    lastPanelSig = '';
+  }
+
+  for (const s of game.suicideCannons) {
+    if (s.exploded) continue;
+    s.countdown -= dt;
+    const currentInt = Math.ceil(Math.max(0, s.countdown));
+    if (currentInt !== s.lastCountdownInt && currentInt > 0) {
+      s.lastCountdownInt = currentInt;
+      sfxCountdown();
+    }
+    if (s.countdown <= 0) {
+      s.exploded = true;
+      for (const e of game.enemies) {
+        if (e.dead || e.reachedEnd) continue;
+        if (Math.hypot(e.x - s.x, e.y - s.y) <= SUICIDE_CANNON_RADIUS) damageEnemy(e, SUICIDE_CANNON_DAMAGE);
+      }
+      spawnExplosion(s.x, s.y);
+      sfxExplosion();
+    }
+  }
+
+  const hadSuicide = game.suicideCannons.length;
+  game.suicideCannons = game.suicideCannons.filter(s => !s.exploded);
+  if (game.suicideCannons.length !== hadSuicide && game.selectedSuicide && game.selectedSuicide.exploded) {
+    game.selectedSuicide = null;
+    lastPanelSig = '';
+  }
+
+  for (const e of game.enemies) {
+    if (e.reachedEnd && !e.dead) {
+      e.dead = true;
+      game.lives -= e.boss ? 5 : 1;
+      if (game.lives <= 0) {
+        game.lives = 0;
+        game.state = 'lost';
+        sfxLose();
+        showOverlay(false);
+        return;
+      }
+    }
+  }
+
+  for (const t of game.towers) {
+    t.cooldown -= dt;
+    if (t.cooldown <= 0) {
+      const target = findTarget(t);
+      if (target) {
+        shoot(t, target);
+        t.cooldown = 1 / towerFireRate(t);
+      } else t.cooldown = 0;
+    }
+  }
+
+  for (const p of game.projectiles) {
+    if (!p.target || p.target.dead || p.target.reachedEnd) { p.dead = true; continue; }
+    const dx = p.target.x - p.x, dy = p.target.y - p.y;
+    const d = Math.hypot(dx, dy);
+    const step = p.speed * dt;
+    if (d <= step) {
+      p.x = p.target.x; p.y = p.target.y;
+      applyHit(p);
+      p.dead = true;
+    } else { p.x += dx / d * step; p.y += dy / d * step; }
+  }
+  game.projectiles = game.projectiles.filter(p => !p.dead);
+
+  for (const b of game.beams) b.life -= dt;
+  game.beams = game.beams.filter(b => b.life > 0);
+
+  const friction = Math.pow(0.94, dt * 60);
+  for (const pt of game.particles) {
+    pt.x += pt.vx * dt; pt.y += pt.vy * dt;
+    pt.vx *= friction; pt.vy *= friction;
+    pt.life -= dt;
+  }
+  game.particles = game.particles.filter(p => p.life > 0);
+
+  for (const dn of game.damageNumbers) {
+    dn.x += dn.vx * dt; dn.y += dn.vy * dt;
+    dn.vy += 90 * dt; dn.life -= dt;
+  }
+  game.damageNumbers = game.damageNumbers.filter(d => d.life > 0);
+
+  game.enemies = game.enemies.filter(e => !e.dead && !e.reachedEnd);
+}
+
+function onLevelComplete() {
+  progress.completed[game.level.id] = true;
+  if (game.level.id + 1 <= LEVELS.length) {
+    progress.unlockedLevel = Math.max(progress.unlockedLevel, game.level.id + 1);
+  }
+  saveProgress();
+}
+
+function onSpecialModeGameOver() {
+  if (!game) return;
+  let changed = false;
+  if (game.mode === 'endless') {
+    if (game.wave > progress.endlessBest) { progress.endlessBest = game.wave; changed = true; }
+    if (Math.floor(game.gold) > progress.endlessMaxGold) { progress.endlessMaxGold = Math.floor(game.gold); changed = true; }
+    deleteEndlessSave();
+  } else if (game.mode === 'limit') {
+    if (game.wave > progress.limitBest) { progress.limitBest = game.wave; changed = true; }
+  } else if (game.mode === 'random') {
+    if (game.wave > progress.randomBest) { progress.randomBest = game.wave; changed = true; }
+  } else if (game.mode === 'defense') {
+    if (game.wave > progress.defenseBest) { progress.defenseBest = game.wave; changed = true; }
+  } else if (game.mode === 'op') {
+    if (game.wave > progress.opBest) { progress.opBest = game.wave; changed = true; }
+  }
+  if (changed) saveProgress();
+}
+
+/* =========================================================
+   绘制
+   ========================================================= */
+function strokePath(path) {
+  ctx.beginPath();
+  ctx.moveTo(path[0].x, path[0].y);
+  for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+  ctx.stroke();
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(70, 100, 150, 0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let y = 0; y <= H; y += 40) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke();
+}
+
+function drawPath() {
+  const path = game.level.path;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  /* 爽模式路径加金色发光 */
+  if (game.mode === 'op') {
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.15)';
+    ctx.lineWidth = 72;
+    strokePath(path);
+  }
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.06)'; ctx.lineWidth = 64; strokePath(path);
+  ctx.strokeStyle = game.mode === 'op' ? '#3a2a08' : '#1b2a45'; ctx.lineWidth = 52; strokePath(path);
+  ctx.strokeStyle = game.mode === 'op' ? '#5a4210' : '#24374f'; ctx.lineWidth = 44; strokePath(path);
+  ctx.setLineDash([10, 16]); ctx.lineDashOffset = -game.time * 40;
+  ctx.strokeStyle = game.mode === 'op' ? 'rgba(251, 191, 36, 0.5)' : 'rgba(125, 175, 235, 0.28)';
+  ctx.lineWidth = 3; strokePath(path);
+  ctx.setLineDash([]);
+  const startX = Math.max(26, path[0].x + 34);
+  ctx.beginPath(); ctx.arc(startX, path[0].y, 26, 0, Math.PI * 2);
+  ctx.fillStyle = game.mode === 'op' ? 'rgba(251, 191, 36, 0.22)' : 'rgba(168, 85, 247, 0.22)'; ctx.fill();
+  ctx.strokeStyle = game.mode === 'op' ? 'rgba(251, 191, 36, 0.7)' : 'rgba(168, 85, 247, 0.6)'; ctx.lineWidth = 2; ctx.stroke();
+}
+
+function drawCastle() {
+  const path = game.level.path;
+  const last = path[path.length - 1];
+  const bx = last.x - 10, by = last.y;
+  const t = game.time;
+  const pulse1 = 0.5 + 0.5 * Math.sin(t * 3.0);
+  const pulse2 = 0.5 + 0.5 * Math.sin(t * 2.0 + 1.3);
+  const maxLives = game.mode === 'defense' ? DEFENSE_MODE_START_LIVES :
+                   game.mode === 'op' ? OP_MODE_START_LIVES : 20;
+  const hpRatio = Math.min(1, game.lives / maxLives);
+  let baseColor, rgbStr;
+  if (hpRatio > 0.6) { baseColor = '#38bdf8'; rgbStr = '56, 189, 248'; }
+  else if (hpRatio > 0.3) { baseColor = '#fbbf24'; rgbStr = '251, 191, 36'; }
+  else { baseColor = '#ef4444'; rgbStr = '239, 68, 68'; }
+  ctx.beginPath(); ctx.arc(bx, by, 30 + pulse1 * 14, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(' + rgbStr + ', ' + (0.4 * (1 - pulse1)) + ')'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(bx, by, 24 + pulse2 * 11, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(' + rgbStr + ', ' + (0.32 * (1 - pulse2)) + ')'; ctx.lineWidth = 1.8; ctx.stroke();
+  ctx.save(); ctx.shadowBlur = 26 + pulse1 * 16; ctx.shadowColor = baseColor;
+  ctx.beginPath(); ctx.arc(bx, by, 20, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(' + rgbStr + ', 0.35)'; ctx.fill();
+  ctx.strokeStyle = baseColor; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+  ctx.beginPath(); ctx.arc(bx, by, 14, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(' + rgbStr + ', 0.15)'; ctx.fill();
+  const dotCount = 4, dotAngleBase = t * 1.6;
+  for (let i = 0; i < dotCount; i++) {
+    const angle = dotAngleBase + (i / dotCount) * Math.PI * 2;
+    const dx = Math.cos(angle) * 28, dy = Math.sin(angle) * 28;
+    ctx.save(); ctx.shadowBlur = 10; ctx.shadowColor = baseColor;
+    ctx.beginPath(); ctx.arc(bx + dx, by + dy, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = baseColor; ctx.fill(); ctx.restore();
+  }
+  ctx.save(); ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 14 + pulse1 * 10; ctx.shadowColor = baseColor;
+  ctx.fillStyle = '#ffffff'; ctx.fillText('🏰', bx, by + 1); ctx.restore();
+  if (hpRatio <= 0.5) {
+    const warnPulse = 0.5 + 0.5 * Math.sin(t * 8);
+    ctx.beginPath(); ctx.arc(bx, by, 34 + warnPulse * 4, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(239, 68, 68, ' + (0.25 + warnPulse * 0.35) + ')';
+    ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+function drawRange(x, y, r, color) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color + '14'; ctx.fill();
+  ctx.strokeStyle = color + '88'; ctx.lineWidth = 2;
+  ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
+}
+
+function drawTowers() {
+  for (const t of game.towers) {
+    const def = TOWER_TYPES[t.type];
+    /* 爽模式：塔底下金色光环 */
+    if (game.mode === 'op') {
+      const opPulse = 0.5 + 0.5 * Math.sin(game.time * 4 + t.x * 0.01);
+      ctx.beginPath(); ctx.arc(t.x, t.y, 22 + opPulse * 4, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(251, 191, 36, ${0.3 + opPulse * 0.4})`;
+      ctx.lineWidth = 2; ctx.stroke();
+    }
+    if (t.demonOriginalDmg !== undefined) {
+      const pulse = 0.5 + 0.5 * Math.sin(game.time * 8);
+      ctx.beginPath(); ctx.arc(t.x, t.y, 26 + pulse * 5, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(239, 68, 68, ${0.35 + pulse * 0.45})`; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.beginPath(); ctx.arc(t.x, t.y, 30 + pulse * 4, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(249, 115, 22, ${0.15 + pulse * 0.25})`; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(t.x, t.y, 17, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f1a2c'; ctx.fill();
+    ctx.strokeStyle = def.color + '55'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.angle);
+    ctx.fillStyle = def.color;
+    ctx.beginPath(); ctx.roundRect(0, -4.5, 22, 9, 3); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.arc(t.x, t.y, 12, 0, Math.PI * 2); ctx.fillStyle = def.color; ctx.fill();
+    ctx.beginPath(); ctx.arc(t.x, t.y, 6, 0, Math.PI * 2); ctx.fillStyle = 'rgba(10, 20, 35, 0.75)'; ctx.fill();
+    const totalLv = (t.dmgLvl - 1) + (t.rateLvl - 1);
+    if (totalLv > 0) {
+      ctx.fillStyle = '#fbbf24';
+      for (let i = 0; i < totalLv; i++) { ctx.beginPath(); ctx.arc(t.x - 8 + i * 5, t.y + 21, 2, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (t.fixed) {
+      ctx.beginPath(); ctx.arc(t.x, t.y, 23, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)'; ctx.lineWidth = 1.6;
+      ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fbbf24'; ctx.fillText('🏰', t.x, t.y - 27);
+    }
+    if (game.selectedTower === t) {
+      ctx.beginPath(); ctx.arc(t.x, t.y, 21, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+  }
+}
+
+function drawDefenses() {
+  for (const d of game.defenses) {
+    const t = game.time;
+    const hpRatio = Math.max(0, d.hp / d.maxHp);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+    ctx.beginPath(); ctx.ellipse(d.x, d.y + 4, 20, 10, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fill();
+    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(t * 0.8);
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const r = 24;
+      const px = Math.cos(angle) * r, py = Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    let shieldColor;
+    if (game.mode === 'op') {
+      /* 爽模式：护盾金光 */
+      shieldColor = `rgba(251, 191, 36, ${0.7 + pulse * 0.3})`;
+    } else {
+      if (hpRatio > 0.6) shieldColor = `rgba(148, 163, 184, ${0.5 + pulse * 0.4})`;
+      else if (hpRatio > 0.3) shieldColor = `rgba(251, 191, 36, ${0.55 + pulse * 0.4})`;
+      else shieldColor = `rgba(239, 68, 68, ${0.7 + pulse * 0.3})`;
+    }
+    ctx.strokeStyle = shieldColor; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(d.x, d.y, 18 + pulse * 2, 0, Math.PI * 2);
+    ctx.fillStyle = hpRatio > 0.3 ? 'rgba(148, 163, 184, 0.15)' : 'rgba(239, 68, 68, 0.2)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(d.x, d.y, 16, 0, Math.PI * 2); ctx.fillStyle = '#1e293b'; ctx.fill();
+    ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(d.x, d.y, 11, 0, Math.PI * 2); ctx.fillStyle = '#334155'; ctx.fill();
+    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#e2e8f0'; ctx.fillText('🛡️', d.x, d.y + 1);
+    const bw = 40, bh = 5, bx = d.x - bw / 2, by = d.y - 32;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+    let barColor;
+    if (hpRatio > 0.6) barColor = '#4ade80';
+    else if (hpRatio > 0.3) barColor = '#facc15';
+    else barColor = '#ef4444';
+    ctx.fillStyle = barColor; ctx.fillRect(bx, by, bw * hpRatio, bh);
+    ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#e2e8f0';
+    /* 爽模式：血量以万/千为单位显示 */
+    const hpText = game.mode === 'op' ? (Math.ceil(d.hp) + '') : (Math.ceil(d.hp) + '/' + d.maxHp);
+    ctx.fillText(hpText, d.x, by - 6);
+    if (game.selectedDefense === d) {
+      ctx.beginPath(); ctx.arc(d.x, d.y, 28, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+    const hasBiter = game.enemies.some(e => !e.dead && !e.reachedEnd && Math.hypot(e.x - d.x, e.y - d.y) < DEFENSE_TOWER_BITE_RANGE);
+    if (hasBiter) {
+      const bitePulse = 0.5 + 0.5 * Math.sin(t * 15);
+      ctx.beginPath(); ctx.arc(d.x, d.y, 26 + bitePulse * 3, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + bitePulse * 0.5})`; ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+}
+
+function drawSuicideCannons() {
+  for (const s of game.suicideCannons) {
+    const t = game.time;
+    const urgency = Math.max(0, 1 - s.countdown / SUICIDE_CANNON_COUNTDOWN);
+    const pulseSpeed = 8 + urgency * 25;
+    const pulse = 0.5 + 0.5 * Math.sin(t * pulseSpeed);
+    ctx.beginPath(); ctx.arc(s.x, s.y, SUICIDE_CANNON_RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(239, 68, 68, ${0.15 + urgency * 0.35})`;
+    ctx.lineWidth = 1.5; ctx.setLineDash([6, 8]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(s.x, s.y, SUICIDE_CANNON_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(239, 68, 68, ${0.03 + urgency * 0.07})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(s.x, s.y, 24 + pulse * 8, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulse * 0.5})`; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(s.x, s.y, 18 + pulse * 5, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(251, 146, 60, ${0.3 + pulse * 0.4})`; ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.beginPath(); ctx.arc(s.x, s.y, 16, 0, Math.PI * 2);
+    ctx.fillStyle = '#2a0e14'; ctx.fill();
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.save(); ctx.shadowBlur = 12 + pulse * 10; ctx.shadowColor = '#ef4444';
+    ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(239, 68, 68, ${0.5 + pulse * 0.5})`; ctx.fill(); ctx.restore();
+    ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fef2f2'; ctx.fillText('💥', s.x, s.y + 1);
+    const secs = Math.max(0, s.countdown).toFixed(1);
+    ctx.font = 'bold 18px "Courier New", monospace';
+    ctx.strokeStyle = '#0a0508'; ctx.lineWidth = 4;
+    ctx.strokeText(secs + 's', s.x, s.y - 34);
+    let countColor;
+    if (s.countdown > 2) countColor = '#fbbf24';
+    else if (s.countdown > 1) countColor = '#fb923c';
+    else countColor = '#ef4444';
+    ctx.fillStyle = countColor;
+    ctx.fillText(secs + 's', s.x, s.y - 34);
+    if (game.selectedSuicide === s) {
+      ctx.beginPath(); ctx.arc(s.x, s.y, 26, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+  }
+}
+
+function drawMines() {
+  for (const m of game.mines) {
+    const t = game.time;
+    const breathe = 0.5 + 0.5 * Math.sin(t * 2.2 + m.x * 0.01);
+    ctx.beginPath(); ctx.arc(m.x, m.y, MINE_TRIGGER_RADIUS + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(249, 115, 22, ${0.12 + breathe * 0.15})`;
+    ctx.lineWidth = 1.2; ctx.setLineDash([4, 6]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.ellipse(m.x, m.y + 3, 16, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(m.x, m.y + 2, 11, Math.PI, Math.PI * 2); ctx.closePath();
+    ctx.fillStyle = '#3a1810'; ctx.fill();
+    ctx.strokeStyle = '#7f3218'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(m.x, m.y + 2, 8, Math.PI, Math.PI * 2); ctx.closePath();
+    ctx.fillStyle = '#5a2614'; ctx.fill();
+    ctx.strokeStyle = '#a3471e'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.save(); ctx.shadowBlur = 8 + breathe * 10; ctx.shadowColor = '#ef4444';
+    ctx.beginPath(); ctx.arc(m.x, m.y - 1, 3 + breathe * 1.2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(239, 68, 68, ${0.7 + breathe * 0.3})`; ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.moveTo(m.x, m.y - 4); ctx.lineTo(m.x, m.y - 8);
+    ctx.strokeStyle = '#7f3218'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(m.x, m.y - 9, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(251, 146, 60, ${0.6 + breathe * 0.4})`; ctx.fill();
+    if (game.selectedMine === m) {
+      ctx.beginPath(); ctx.arc(m.x, m.y, 24, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+  }
+}
+
+function drawEnemies() {
+  for (const e of game.enemies) {
+    if (e.slowTimer > 0) {
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.22)'; ctx.fill();
+    }
+    if (e.poisonTimer > 0) {
+      const poisonPulse = 0.5 + 0.5 * Math.sin(game.time * 6);
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 5 + poisonPulse * 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(163, 230, 53, 0.28)'; ctx.fill();
+      ctx.strokeStyle = `rgba(163, 230, 53, ${0.5 + poisonPulse * 0.3})`; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+    ctx.fillStyle = e.color; ctx.fill();
+    ctx.lineWidth = e.boss ? 3 : 2;
+    ctx.strokeStyle = e.boss ? '#ffffff' : 'rgba(0,0,0,0.45)'; ctx.stroke();
+    if (e.bitingDefense && !e.bitingDefense.dead) {
+      const angerPulse = 0.5 + 0.5 * Math.sin(game.time * 12);
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 5 + angerPulse * 2, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(239, 68, 68, ${0.6 + angerPulse * 0.4})`; ctx.lineWidth = 2; ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(e.x - e.radius * 0.3, e.y - e.radius * 0.2, e.radius * 0.22, 0, Math.PI * 2);
+    ctx.arc(e.x + e.radius * 0.3, e.y - e.radius * 0.2, e.radius * 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = '#0b1220'; ctx.fill();
+    const bw = e.radius * 2.6, bh = 5;
+    const bx = e.x - bw / 2, by = e.y - e.radius - 13;
+    const ratio = Math.max(0, e.hp / e.maxHp);
+    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+    ctx.fillStyle = ratio > 0.5 ? '#4ade80' : ratio > 0.25 ? '#facc15' : '#ef4444';
+    ctx.fillRect(bx, by, bw * ratio, bh);
+  }
+}
+
+function drawProjectiles() {
+  for (const p of game.projectiles) {
+    if (p.isSniper) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.radius + 1, 0, Math.PI * 2);
+      ctx.fillStyle = '#f5f3ff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.radius + 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(192, 132, 252, 0.45)'; ctx.fill();
+      continue;
+    }
+    if (p.isPoison) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.radius + 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#a3e635'; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.radius + 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(163, 230, 53, 0.35)'; ctx.fill();
+      continue;
+    }
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius + 3, 0, Math.PI * 2);
+    ctx.fillStyle = p.color + '33'; ctx.fill();
+  }
+}
+
+function drawBeams() {
+  for (const b of game.beams) {
+    const a = Math.max(0, b.life / b.maxLife);
+    const w = b.width || 7;
+    ctx.strokeStyle = b.color + Math.round(a * 90).toString(16).padStart(2, '0');
+    ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 255, 255, ' + (a * 0.9) + ')';
+    ctx.lineWidth = Math.max(1, w * 0.25);
+    ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+  }
+}
+
+function drawParticles() {
+  for (const p of game.particles) {
+    const a = Math.max(0, p.life / p.maxLife);
+    ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawDamageNumbers() {
+  for (const dn of game.damageNumbers) {
+    const a = Math.max(0, dn.life / dn.maxLife);
+    ctx.globalAlpha = a;
+    ctx.font = `bold ${dn.size}px "Courier New", monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 3;
+    ctx.strokeText(dn.value, dn.x, dn.y);
+    ctx.fillStyle = dn.color; ctx.fillText(dn.value, dn.x, dn.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  if (!game) return;
+  ctx.fillStyle = game.mode === 'op' ? '#120b02' : '#0b1220';
+  ctx.fillRect(0, 0, W, H);
+  drawGrid(); drawPath(); drawCastle();
+  drawMines();
+  if (game.selectedTower) {
+    const t = game.selectedTower;
+    drawRange(t.x, t.y, TOWER_TYPES[t.type].range, '#fbbf24');
+  }
+  if (game.selectedTowerType && game.mouse) {
+    if (game.selectedTowerType === 'defense') {
+      const cost = getTowerCost('defense');
+      const ok = canPlaceDefense(game.mouse.x, game.mouse.y) && game.gold >= cost;
+      const col = ok ? '#4ade80' : '#ef4444';
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, 24, 0, Math.PI * 2);
+      ctx.fillStyle = col + '18'; ctx.fill();
+      ctx.strokeStyle = col + 'aa'; ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.save(); ctx.translate(game.mouse.x, game.mouse.y); ctx.rotate(game.time * 0.8);
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        const r = 24;
+        const px = Math.cos(angle) * r, py = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.strokeStyle = col + '99'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.7; ctx.fillText('🛡️', game.mouse.x, game.mouse.y + 1); ctx.globalAlpha = 1;
+    } else if (game.selectedTowerType === 'suicide') {
+      const cost = getTowerCost('suicide');
+      const ok = canPlaceSuicide(game.mouse.x, game.mouse.y) && game.gold >= cost;
+      const col = ok ? '#ef4444' : '#64748b';
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, SUICIDE_CANNON_RADIUS, 0, Math.PI * 2);
+      ctx.strokeStyle = col + 'aa'; ctx.lineWidth = 2;
+      ctx.setLineDash([6, 8]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, SUICIDE_CANNON_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = col + '18'; ctx.fill();
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, 16, 0, Math.PI * 2);
+      ctx.fillStyle = ok ? 'rgba(239,68,68,0.6)' : 'rgba(100,116,139,0.5)'; ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fef2f2'; ctx.fillText('💥', game.mouse.x, game.mouse.y + 1);
+    } else if (game.selectedTowerType === 'mine') {
+      const cost = getTowerCost('mine');
+      const ok = canPlaceMine(game.mouse.x, game.mouse.y) && game.gold >= cost;
+      const col = ok ? '#f97316' : '#64748b';
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, MINE_RADIUS, 0, Math.PI * 2);
+      ctx.strokeStyle = col + '88'; ctx.lineWidth = 2;
+      ctx.setLineDash([6, 8]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, MINE_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = col + '12'; ctx.fill();
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, MINE_TRIGGER_RADIUS, 0, Math.PI * 2);
+      ctx.strokeStyle = col + 'cc'; ctx.lineWidth = 1.8;
+      ctx.setLineDash([4, 5]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, 11, Math.PI, Math.PI * 2); ctx.closePath();
+      ctx.fillStyle = ok ? 'rgba(249,115,22,0.7)' : 'rgba(100,116,139,0.5)'; ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+      ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff7ed'; ctx.fillText('🧨', game.mouse.x, game.mouse.y - 2);
+    } else {
+      const def = TOWER_TYPES[game.selectedTowerType];
+      const unlocked = isTowerUnlocked(game.selectedTowerType);
+      const cost = getTowerCost(game.selectedTowerType);
+      const ok = canPlaceNormal(game.mouse.x, game.mouse.y) && game.gold >= cost && unlocked;
+      const col = ok ? '#4ade80' : '#ef4444';
+      drawRange(game.mouse.x, game.mouse.y, def.range, col);
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath(); ctx.arc(game.mouse.x, game.mouse.y, 15, 0, Math.PI * 2);
+      ctx.fillStyle = ok ? def.color : '#ef4444'; ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+  drawTowers(); drawDefenses(); drawSuicideCannons(); drawEnemies();
+  drawProjectiles(); drawBeams(); drawParticles(); drawDamageNumbers();
+}
+
+/* =========================================================
+   HUD
+   ========================================================= */
+function updateHUD() {
+  if (!game) return;
+  livesEl.textContent = game.lives;
+  goldEl.textContent = Math.floor(game.gold);
+  waveEl.textContent = game.wave;
+  maxWaveEl.textContent = isInfiniteMode() ? '∞' : game.level.waveCount;
+
+  if (game.state === 'paused') { waveStatusEl.textContent = '已暂停'; startBtn.disabled = true; }
+  else if (game.state !== 'playing') { waveStatusEl.textContent = game.state === 'won' ? '守城成功！' : '防线失守…'; startBtn.disabled = true; }
+  else if (game.waveActive) {
+    const remain = game.enemies.length + game.spawnQueue.length;
+    waveStatusEl.textContent = `第 ${game.wave} 波 · 剩 ${remain}`;
+    startBtn.disabled = true;
+  } else {
+    const nextWave = game.wave + 1;
+    if (isInfiniteMode() || nextWave <= game.level.waveCount) {
+      const cfg = waveConfig(nextWave);
+      const bossTag = cfg.boss ? ' ⚠️Boss' : '';
+      waveStatusEl.textContent = `下一波(${cfg.count}只${bossTag}):${Math.ceil(game.betweenTimer)}s`;
+    } else {
+      waveStatusEl.textContent = `下一波：${Math.ceil(game.betweenTimer)}s`;
+    }
+    startBtn.disabled = false;
+  }
+
+  for (const btn of shopEl.children) {
+    const typeKey = btn.dataset.type;
+    if (!typeKey) continue;
+    const cost = getTowerCost(typeKey);
+    btn.classList.toggle('poor', game.gold < cost);
+  }
+}
+
+/* =========================================================
+   商店
+   ========================================================= */
+function buildShop() {
+  shopEl.innerHTML = '';
+
+  const isOp = game.mode === 'op';
+
+  /* 防御炮台 */
+  const defBtn = document.createElement('button');
+  defBtn.className = 'tower-btn defense-type' + (isOp ? ' op-tower' : '');
+  defBtn.dataset.type = 'defense';
+  const defCost = getTowerCost('defense');
+  const defHp = getDefenseMaxHp();
+  const defDesc = isOp ? `扛 ${defHp} 血 · 啃 ${Math.round(defHp / OP_MODE_BITE_RATE)} 秒` : DEFENSE_TOWER_TYPE.desc;
+  defBtn.innerHTML = `<span class="tb-icon">${DEFENSE_TOWER_TYPE.icon}</span><span class="tb-info"><b>${DEFENSE_TOWER_TYPE.name}</b><small>${defDesc}</small></span><span class="tb-cost">🪙${defCost}</span>`;
+  defBtn.addEventListener('click', () => {
+    if (game.state !== 'playing') return;
+    game.selectedTower = null; game.selectedDefense = null; game.selectedSuicide = null; game.selectedMine = null;
+    game.selectedTowerType = game.selectedTowerType === 'defense' ? null : 'defense';
+    updateShopUI(); updateTowerPanel();
+  });
+  shopEl.appendChild(defBtn);
+
+  if (game.mode !== 'defense') {
+    /* 炸弹 */
+    const suiBtn = document.createElement('button');
+    suiBtn.className = 'tower-btn suicide-type' + (isOp ? ' op-tower' : '');
+    suiBtn.dataset.type = 'suicide';
+    const suiCost = getTowerCost('suicide');
+    suiBtn.innerHTML = `<span class="tb-icon">${SUICIDE_CANNON_TYPE.icon}</span><span class="tb-info"><b>${SUICIDE_CANNON_TYPE.name}</b><small>${SUICIDE_CANNON_TYPE.desc}</small></span><span class="tb-cost">🪙${suiCost}</span>`;
+    suiBtn.addEventListener('click', () => {
+      if (game.state !== 'playing') return;
+      game.selectedTower = null; game.selectedDefense = null; game.selectedSuicide = null; game.selectedMine = null;
+      game.selectedTowerType = game.selectedTowerType === 'suicide' ? null : 'suicide';
+      updateShopUI(); updateTowerPanel();
+    });
+    shopEl.appendChild(suiBtn);
+
+    /* 地雷 */
+    const mineBtn = document.createElement('button');
+    mineBtn.className = 'tower-btn mine-type' + (isOp ? ' op-tower' : '');
+    mineBtn.dataset.type = 'mine';
+    const mineCost = getTowerCost('mine');
+    mineBtn.innerHTML = `<span class="tb-icon">${MINE_TYPE.icon}</span><span class="tb-info"><b>${MINE_TYPE.name}</b><small>${MINE_TYPE.desc}</small></span><span class="tb-cost">🪙${mineCost}</span>`;
+    mineBtn.addEventListener('click', () => {
+      if (game.state !== 'playing') return;
+      game.selectedTower = null; game.selectedDefense = null; game.selectedSuicide = null; game.selectedMine = null;
+      game.selectedTowerType = game.selectedTowerType === 'mine' ? null : 'mine';
+      updateShopUI(); updateTowerPanel();
+    });
+    shopEl.appendChild(mineBtn);
+  }
+
+  if (game.mode !== 'defense') {
+    Object.values(TOWER_TYPES).forEach(def => {
+      const unlocked = isTowerUnlocked(def.key);
+      const isBanned = (game.mode === 'random' || game.mode === 'limit')
+        && game.bannedTowers && game.bannedTowers.includes(def.key);
+
+      const btn = document.createElement('button');
+      let cls = 'tower-btn';
+      if (isOp) cls += ' op-tower';
+      if (isBanned) cls += ' banned';
+      else if (!unlocked) cls += ' locked';
+      btn.className = cls;
+
+      const cost = getTowerCost(def.key);
+
+      if (isBanned) {
+        btn.innerHTML = `<span class="tb-icon">${def.icon}</span><span class="tb-info"><b>${def.name}</b><small>本波被禁用</small></span><span class="tb-cost">🚫</span>`;
+      } else if (unlocked) {
+        btn.dataset.type = def.key;
+        const nameExtra = isOp ? '<span class="tb-op-badge">满级</span>' : '';
+        btn.innerHTML = `<span class="tb-icon">${def.icon}</span><span class="tb-info"><b>${def.name}${nameExtra}</b><small>${def.desc}</small></span><span class="tb-cost">🪙${cost}</span>`;
+        btn.addEventListener('click', () => {
+          if (game.state !== 'playing') return;
+          game.selectedTower = null; game.selectedDefense = null; game.selectedSuicide = null; game.selectedMine = null;
+          game.selectedTowerType = game.selectedTowerType === def.key ? null : def.key;
+          updateShopUI(); updateTowerPanel();
+        });
+      } else {
+        btn.innerHTML = `<span class="tb-icon">🔒</span><span class="tb-info"><b>???</b><small>通关前置关卡解锁</small></span><span class="tb-cost">—</span>`;
+      }
+      shopEl.appendChild(btn);
+    });
+  }
+}
+
+function updateShopUI() {
+  for (const btn of shopEl.children) {
+    if (btn.dataset.type) btn.classList.toggle('active', btn.dataset.type === game.selectedTowerType);
+  }
+}
+
+/* =========================================================
+   塔面板
+   ========================================================= */
+let lastPanelSig = '';
+
+function updateTowerPanel() {
+  if (!game) return;
+  const isOp = game.mode === 'op';
+
+  const m = game.selectedMine;
+  if (m && game.state === 'playing') {
+    const sig = `MINE|${Math.floor(game.gold)}`;
+    if (sig === lastPanelSig) return;
+    lastPanelSig = sig;
+    towerPanelEl.classList.remove('hidden');
+    towerPanelEl.innerHTML = `
+      <div class="tp-head"><span style="color:${MINE_TYPE.color}">🧨 ${MINE_TYPE.name}</span><button id="tpClose">✕</button></div>
+      <div class="tp-mine-status"><span class="label">状态</span><span class="value">⏳ 等待触发</span></div>
+      <div class="tp-defense-hp" style="margin-top:0;background:#0a0e18;"><span>爆炸伤害</span><span class="hp-val" style="color:#ef4444;">${MINE_DAMAGE}</span></div>
+      <div class="tp-defense-hp" style="margin-top:0;background:#0a0e18;"><span>爆炸半径</span><span class="hp-val" style="color:#fb923c;">${MINE_RADIUS}px</span></div>
+      <div class="tp-defense-hp" style="margin-top:0;background:#0a0e18;"><span>触发距离</span><span class="hp-val" style="color:#f97316;">${MINE_TRIGGER_RADIUS}px</span></div>
+      <button class="tp-sell" data-sell-mine>拆除 · 返还 🪙${Math.floor(m.invested * 0.5)}</button>
+      <div class="tp-defense-note">🧨 敌人踩到即爆 · 一次性</div>
+    `;
+    towerPanelEl.querySelector('#tpClose').onclick = () => { game.selectedMine = null; lastPanelSig = ''; };
+    const sellMineBtn = towerPanelEl.querySelector('[data-sell-mine]');
+    if (sellMineBtn) sellMineBtn.onclick = () => sellMine(m);
+    return;
+  }
+
+  const s = game.selectedSuicide;
+  if (s && game.state === 'playing') {
+    const sig = `SUI|${s.countdown.toFixed(1)}|${Math.floor(game.gold)}`;
+    if (sig === lastPanelSig) return;
+    lastPanelSig = sig;
+    towerPanelEl.classList.remove('hidden');
+    towerPanelEl.innerHTML = `
+      <div class="tp-head"><span style="color:${SUICIDE_CANNON_TYPE.color}">💥 ${SUICIDE_CANNON_TYPE.name}</span><button id="tpClose">✕</button></div>
+      <div class="tp-suicide-count"><span class="label">引爆倒计时</span><span class="count">${Math.max(0, s.countdown).toFixed(1)}s</span></div>
+      <div class="tp-defense-hp" style="margin-top:0;background:#0a0e18;"><span>爆炸伤害</span><span class="hp-val" style="color:#ef4444;">${SUICIDE_CANNON_DAMAGE}</span></div>
+      <div class="tp-defense-hp" style="margin-top:0;background:#0a0e18;"><span>爆炸半径</span><span class="hp-val" style="color:#fb923c;">${SUICIDE_CANNON_RADIUS}px</span></div>
+      <div class="tp-defense-note warn">⚠️ 即将爆炸 · 无法取消</div>
+    `;
+    towerPanelEl.querySelector('#tpClose').onclick = () => { game.selectedSuicide = null; lastPanelSig = ''; };
+    return;
+  }
+
+  const d = game.selectedDefense;
+  if (d && game.state === 'playing') {
+    const sig = `DEF|${Math.ceil(d.hp)}|${d.bitten ? 1 : 0}|${Math.floor(game.gold)}|${d.maxHp}`;
+    if (sig === lastPanelSig) return;
+    lastPanelSig = sig;
+    const hpRatio = Math.max(0, d.hp / d.maxHp);
+    let hpClass = '';
+    if (hpRatio <= 0.3) hpClass = 'crit';
+    else if (hpRatio <= 0.6) hpClass = 'low';
+    towerPanelEl.classList.remove('hidden');
+    let sellBlock = '';
+    if (d.bitten) sellBlock = `<div class="tp-defense-note warn">⚠️ 已被啃咬，无法出售</div>`;
+    else sellBlock = `<button class="tp-sell" data-sell-defense>出售 · 返还 🪙${Math.floor(d.invested * DEFENSE_TOWER_SELL_RATIO)}</button>`;
+    const biteRate = getDefenseBiteRate();
+    towerPanelEl.innerHTML = `
+      <div class="tp-head"><span style="color:${DEFENSE_TOWER_TYPE.color}">🛡️ ${DEFENSE_TOWER_TYPE.name}${isOp ? ' · 爽' : ''}</span><button id="tpClose">✕</button></div>
+      <div class="tp-defense-hp ${hpClass}"><span>剩余生命</span><span class="hp-val">${Math.ceil(d.hp)} / ${d.maxHp}</span></div>
+      <div class="tp-defense-hp" style="margin-top:0;background:#0a0e18;"><span>啃咬速率</span><span class="hp-val" style="color:#f87171;">${biteRate} 次/秒</span></div>
+      ${sellBlock}
+      <div class="tp-defense-note">🛡️ 建在路径上阻挡怪物 · 无攻击能力</div>
+    `;
+    towerPanelEl.querySelector('#tpClose').onclick = () => { game.selectedDefense = null; lastPanelSig = ''; };
+    const sellDefBtn = towerPanelEl.querySelector('[data-sell-defense]');
+    if (sellDefBtn) sellDefBtn.onclick = () => sellDefense(d);
+    return;
+  }
+
+  const t = game.selectedTower;
+  if (!t || game.state !== 'playing') {
+    if (!towerPanelEl.classList.contains('hidden')) { towerPanelEl.classList.add('hidden'); lastPanelSig = ''; }
+    return;
+  }
+  const sig = `${t.type}|${t.dmgLvl}|${t.rateLvl}|${Math.floor(game.gold)}|${t.invested}|${t.fixed ? 1 : 0}|${game.demonPactUsed ? 1 : 0}|${game.demonPactTimer > 0 ? Math.ceil(game.demonPactTimer) : 0}|${game.wave}`;
+  if (sig === lastPanelSig) return;
+  lastPanelSig = sig;
+  const def = TOWER_TYPES[t.type];
+  const dmgCost = upgradeCost(t, 'dmg');
+  const rateCost = upgradeCost(t, 'rate');
+  towerPanelEl.classList.remove('hidden');
+
+  /* 爽模式：显示塔的金色标记，不显示升级按钮 */
+  let opBlock = '';
+  if (isOp) {
+    opBlock = `<div class="tp-op-tag">🔥 爽模式 · 建造即满级 · 伤害随波数暴增</div>`;
+  }
+
+  let demonBlock = '';
+  if (isOp) {
+    demonBlock = `<div class="tp-demon-locked">🔥 爽模式无需恶魔契约</div>`;
+  } else if (!isDemonPactAvailable()) {
+    demonBlock = `<div class="tp-demon-locked">🔒 该模式无法使用恶魔契约</div>`;
+  } else if (!game.demonPactUsed) {
+    demonBlock = `<button class="tp-demon" data-demon ${game.gold < DEMON_PACT_COST ? 'disabled' : ''}>😈 恶魔契约 · 🪙${DEMON_PACT_COST}<small>全塔满级 ${DEMON_PACT_DURATION}秒 · 每局限一次</small></button>`;
+  } else if (game.demonPactTimer > 0) {
+    demonBlock = `<div class="tp-demon-active">😈 契约生效中 · ${Math.ceil(game.demonPactTimer)}s</div>`;
+  }
+
+  /* 爽模式：不显示升级按钮 */
+  const upgradeBlock = isOp ? '' : `
+    <div class="tp-row"><span>伤害 Lv.${t.dmgLvl}</span>${t.dmgLvl >= MAX_LEVEL ? '<span class="maxed">已满级</span>' : `<button class="up" data-k="dmg" ${game.gold < dmgCost ? 'disabled' : ''}>升级 🪙${dmgCost}</button>`}</div>
+    <div class="tp-row"><span>射速 Lv.${t.rateLvl}</span>${t.rateLvl >= MAX_LEVEL ? '<span class="maxed">已满级</span>' : `<button class="up" data-k="rate" ${game.gold < rateCost ? 'disabled' : ''}>升级 🪙${rateCost}</button>`}</div>
+  `;
+
+  towerPanelEl.innerHTML = `
+    <div class="tp-head"><span style="color:${def.color}">${def.icon} ${def.name}${t.fixed ? ' · 城堡' : ''}${isOp ? ' · 满级' : ''}</span><button id="tpClose">✕</button></div>
+    ${upgradeBlock}
+    <div class="tp-row" style="color:#7f92b0;font-size:11px;margin-top:6px;"><span>伤害 ${formatNumber(towerDamage(t))}</span><span>射速 ${towerFireRate(t).toFixed(2)}/s</span></div>
+    ${t.fixed ? '<div class="tp-fixed">🏰 城堡固定塔 · 不可出售</div>' : `<button class="tp-sell" data-sell>出售 · 返还 🪙${Math.floor(t.invested * 0.6)}</button>`}
+    ${opBlock}
+    ${demonBlock}
+  `;
+  towerPanelEl.querySelector('#tpClose').onclick = () => { game.selectedTower = null; lastPanelSig = ''; };
+  towerPanelEl.querySelectorAll('.up').forEach(b => { b.onclick = () => doUpgrade(t, b.dataset.k); });
+  const sellBtn = towerPanelEl.querySelector('[data-sell]');
+  if (sellBtn) sellBtn.onclick = () => sellTower(t);
+  const demonBtn = towerPanelEl.querySelector('[data-demon]');
+  if (demonBtn) demonBtn.onclick = () => useDemonPact(t);
+}
+
+/* =========================================================
+   Toast
+   ========================================================= */
+let toastTimer = null;
+function showToast(msg, ok = false) {
+  toastEl.textContent = msg;
+  toastEl.style.background = ok ? 'rgba(34, 197, 94, .92)' : 'rgba(220, 60, 60, .92)';
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1100);
+}
+
+/* =========================================================
+   结算浮层
+   ========================================================= */
+function showOverlay(won) {
+  overlayEl.classList.remove('hidden');
+  pointerDownPos = null; pointerDownTime = 0;
+  pauseMaskEl.classList.add('hidden');
+  pauseBtn.textContent = '⏸'; pauseBtn.classList.remove('active');
+  const level = game.level;
+
+  if (game.mode === 'op') {
+    ovTitleEl.textContent = '🔥 爽完了';
+    ovTitleEl.className = 'op-title';
+    const best = Math.max(progress.opBest, game.wave);
+    ovDescEl.innerHTML = `爽就完了 · 你在第 ${game.wave} 波被击溃<br>最佳记录：第 ${best} 波 🏆`;
+    onSpecialModeGameOver();
+    startBtn.disabled = true;
+    return;
+  }
+
+  if (game.mode === 'endless') {
+    if (won) {
+      ovTitleEl.textContent = '∞ 无尽通关';
+      ovTitleEl.className = 'endless-title';
+      ovDescEl.innerHTML = `无尽模式 · 撑过第 ${game.wave} 波<br>这不应该发生，你太强了`;
+    } else {
+      ovTitleEl.textContent = '∞ 无尽结束';
+      ovTitleEl.className = 'endless-title';
+      const best = Math.max(progress.endlessBest, game.wave);
+      ovDescEl.innerHTML = `无尽模式 · 你在第 ${game.wave} 波被击溃<br>最高记录：第 ${best} 波 🏆`;
+      onSpecialModeGameOver();
+    }
+    startBtn.disabled = true;
+    return;
+  }
+
+  if (game.mode === 'defense') {
+    ovTitleEl.textContent = '🛡️ 生存赛结束';
+    ovTitleEl.className = 'mode-title';
+    const best = Math.max(progress.defenseBest, game.wave);
+    ovDescEl.innerHTML = `防御炮台生存赛 · 你在第 ${game.wave} 波被击溃<br>最高记录：第 ${best} 波 🏆`;
+    onSpecialModeGameOver();
+    startBtn.disabled = true;
+    return;
+  }
+
+  if (game.mode === 'limit' || game.mode === 'random') {
+    const modeName = game.mode === 'limit' ? '🚫 塔限制挑战' : '🎲 随机禁用塔';
+    if (won) {
+      ovTitleEl.textContent = modeName + ' · 通关';
+      ovTitleEl.className = 'mode-title';
+      ovDescEl.innerHTML = `第 ${level.id} 关 · ${level.name}<br>剩余生命 ${game.lives} ❤️`;
+    } else {
+      ovTitleEl.textContent = modeName + ' · 失败';
+      ovTitleEl.className = 'mode-title';
+      const best = game.mode === 'limit' ? Math.max(progress.limitBest, game.wave) : Math.max(progress.randomBest, game.wave);
+      ovDescEl.innerHTML = `第 ${level.id} 关 · ${level.name}<br>你在第 ${game.wave} 波被击溃<br>最佳：第 ${best} 波`;
+    }
+    onSpecialModeGameOver();
+    startBtn.disabled = true;
+    return;
+  }
+
+  ovTitleEl.textContent = won ? '🏆 守城成功！' : '💀 游戏结束';
+  ovTitleEl.className = won ? 'win' : 'lose';
+  const nextLevel = LEVELS.find(l => l.id === level.id + 1);
+  let desc = '';
+  if (won) {
+    desc = `第 ${level.id} 关 · ${level.name}<br>剩余生命 ${game.lives} ❤️`;
+    if (level.unlockTower) {
+      const tDef = TOWER_TYPES[level.unlockTower];
+      desc += `<br><span style="color:#5eead4">🎉 解锁新塔：${tDef.icon} ${tDef.name}</span>`;
+    }
+    if (nextLevel) desc += `<br><span style="color:#93a5c4">已解锁第 ${nextLevel.id} 关</span>`;
+    else desc += `<br><span style="color:#fbbf24">🏆 全部关卡通关！</span>`;
+  } else {
+    desc = `第 ${level.id} 关 · ${level.name}<br>你在第 ${game.wave} 波被击溃了<br>最终金币 ${Math.floor(game.gold)} 🪙`;
+  }
+  ovDescEl.innerHTML = desc;
+  startBtn.disabled = true;
+}
+
+/* =========================================================
+   输入
+   ========================================================= */
+function getCanvasPoint(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (clientX - r.left) * (canvas.width / r.width), y: (clientY - r.top) * (canvas.height / r.height) };
+}
+
+let pointerDownPos = null;
+let pointerDownTime = 0;
+
+function onPointerDown(e) {
+  if (!game || game.state !== 'playing') return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const pt = getCanvasPoint(e.clientX, e.clientY);
+  game.mouse = pt;
+  pointerDownPos = pt;
+  pointerDownTime = performance.now();
+  if (e.pointerType === 'touch') e.preventDefault();
+}
+
+function onPointerMove(e) {
+  if (!game) return;
+  const pt = getCanvasPoint(e.clientX, e.clientY);
+  game.mouse = pt;
+  if (e.pointerType === 'touch') e.preventDefault();
+}
+
+function onPointerUp(e) {
+  if (!game || game.state !== 'playing') return;
+  const pt = getCanvasPoint(e.clientX, e.clientY);
+  game.mouse = pt;
+  const dt = performance.now() - pointerDownTime;
+  const moved = pointerDownPos ? Math.hypot(pt.x - pointerDownPos.x, pt.y - pointerDownPos.y) : 0;
+  pointerDownPos = null;
+  if (moved > 18 || dt > 700) return;
+  if (game.selectedTowerType) { tryPlace(pt.x, pt.y); return; }
+
+  let foundMine = null;
+  for (const m of game.mines) if (Math.hypot(m.x - pt.x, m.y - pt.y) < 22) { foundMine = m; break; }
+  if (foundMine) { game.selectedMine = foundMine; game.selectedSuicide = null; game.selectedDefense = null; game.selectedTower = null; lastPanelSig = ''; return; }
+
+  let foundSuicide = null;
+  for (const s of game.suicideCannons) if (Math.hypot(s.x - pt.x, s.y - pt.y) < 26) { foundSuicide = s; break; }
+  if (foundSuicide) { game.selectedSuicide = foundSuicide; game.selectedDefense = null; game.selectedTower = null; game.selectedMine = null; lastPanelSig = ''; return; }
+
+  let foundDefense = null;
+  for (const d of game.defenses) if (Math.hypot(d.x - pt.x, d.y - pt.y) < 26) { foundDefense = d; break; }
+  if (foundDefense) { game.selectedDefense = foundDefense; game.selectedTower = null; game.selectedSuicide = null; game.selectedMine = null; lastPanelSig = ''; return; }
+
+  let foundTower = null;
+  for (const t of game.towers) if (Math.hypot(t.x - pt.x, t.y - pt.y) < 24) { foundTower = t; break; }
+  game.selectedTower = foundTower;
+  game.selectedDefense = null; game.selectedSuicide = null; game.selectedMine = null;
+  lastPanelSig = '';
+}
+
+function onPointerCancel() { pointerDownPos = null; }
+
+if (window.PointerEvent) {
+  canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
+  canvas.addEventListener('pointermove', onPointerMove, { passive: false });
+  canvas.addEventListener('pointerup', onPointerUp, { passive: false });
+  canvas.addEventListener('pointercancel', onPointerCancel);
+  canvas.addEventListener('pointerleave', onPointerCancel);
+} else {
+  canvas.addEventListener('mousedown', onPointerDown);
+  canvas.addEventListener('mousemove', onPointerMove);
+  canvas.addEventListener('mouseup', onPointerUp);
+  canvas.addEventListener('touchstart', (e) => {
+    const t = e.touches[0]; if (!t) return;
+    onPointerDown({ clientX: t.clientX, clientY: t.clientY, pointerType: 'touch', preventDefault: () => e.preventDefault() });
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    const t = e.touches[0]; if (!t) return;
+    onPointerMove({ clientX: t.clientX, clientY: t.clientY, pointerType: 'touch', preventDefault: () => e.preventDefault() });
+  }, { passive: false });
+  canvas.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0]; if (!t) return;
+    onPointerUp({ clientX: t.clientX, clientY: t.clientY, pointerType: 'touch' });
+  }, { passive: false });
+  canvas.addEventListener('touchcancel', onPointerCancel);
+}
+
+canvas.addEventListener('mouseleave', () => { if (!game) return; game.mouse = null; pointerDownPos = null; });
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (!game) return;
+  game.selectedTowerType = null; game.selectedTower = null;
+  game.selectedDefense = null; game.selectedSuicide = null; game.selectedMine = null;
+  updateShopUI(); lastPanelSig = '';
+});
+canvas.addEventListener('dblclick', e => { e.preventDefault(); }, { passive: false });
+
+window.addEventListener('keydown', e => {
+  if (!game) return;
+  if (e.key === 'Escape') {
+    game.selectedTowerType = null; game.selectedTower = null;
+    game.selectedDefense = null; game.selectedSuicide = null; game.selectedMine = null;
+    updateShopUI(); lastPanelSig = '';
+  }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (game.state === 'playing' && !game.waveActive) game.betweenTimer = 0;
+  }
+  if (e.code === 'KeyP') { e.preventDefault(); togglePause(); }
+});
+
+startBtn.addEventListener('click', () => {
+  if (game && game.state === 'playing' && !game.waveActive) game.betweenTimer = 0;
+});
+pauseBtn.addEventListener('click', togglePause);
+speedBtn.addEventListener('click', toggleSpeed);
+soundBtn.addEventListener('click', toggleSound);
+
+pauseResumeBtn.addEventListener('click', () => { if (game && game.state === 'paused') togglePause(); });
+
+pauseSaveExitBtn.addEventListener('click', () => {
+  if (!game) return;
+  if (game.mode !== 'endless') { showToast('只有无尽模式支持存档'); return; }
+  const ok = saveEndlessGame();
+  if (ok) {
+    sfxSave();
+    showToast('💾 存档成功 · 第 ' + game.wave + ' 波', true);
+    setTimeout(() => { showEndlessScreen(); }, 400);
+  } else showToast('存档失败，请重试');
+});
+
+pauseQuitExitBtn.addEventListener('click', () => {
+  if (!game) return;
+  if (game.mode === 'endless') {
+    if (!confirm('确定放弃当前进度并退出吗？未保存的进度会丢失。')) return;
+  } else {
+    if (!confirm('确定要退出当前游戏吗？')) return;
+  }
+  if (game.mode !== 'normal') onSpecialModeGameOver();
+  showMenu();
+});
+
+backToMenuBtn.addEventListener('click', () => {
+  if (!game) { showMenu(); return; }
+  if (game.state === 'playing' || game.state === 'paused') {
+    if (game.mode === 'endless') {
+      if (!confirm('当前无尽模式进度未保存，退出会丢失。确定退出吗？')) return;
+    } else {
+      if (!confirm('确定要退出当前游戏吗？')) return;
+    }
+  }
+  if (game.mode !== 'normal' && game.state !== 'won' && game.state !== 'lost') {
+    onSpecialModeGameOver();
+  }
+  showMenu();
+});
+
+restartBtn.addEventListener('click', () => {
+  if (!game) return;
+  const mode = game.mode;
+  const levelId = game.level.id;
+  if (mode === 'endless') startEndlessMode();
+  else if (mode === 'limit' || mode === 'random' || mode === 'defense' || mode === 'op') startSpecialMode(mode);
+  else startLevel(levelId);
+});
+
+menuBtn.addEventListener('click', () => { showMenu(); });
+
+resetProgressBtn.addEventListener('click', () => {
+  if (confirm('确定要重置所有关卡进度吗？（不会删除无尽模式存档）')) {
+    progress.unlockedLevel = 1;
+    progress.completed = {};
+    progress.endlessBest = 0;
+    progress.endlessMaxGold = 0;
+    progress.limitBest = 0;
+    progress.randomBest = 0;
+    progress.defenseBest = 0;
+    progress.opBest = 0;
+    saveProgress();
+    renderLevelGrid();
+  }
+});
+
+endlessModeBtn.addEventListener('click', () => { showEndlessScreen(); });
+moreModesBtn.addEventListener('click', () => { showModesScreen(); });
+backToMenuFromModes.addEventListener('click', () => { showMenu(); });
+backToMenuFromEndless.addEventListener('click', () => { showMenu(); });
+
+/* =========================================================
+   主循环
+   ========================================================= */
+let lastTime = performance.now();
+
+function loop(now) {
+  const rawDt = (now - lastTime) / 1000;
+  const baseDt = Math.min(0.1, rawDt);
+  const dt = baseDt * (settings.speedMultiplier || 1);
+  lastTime = now;
+  if (currentScreen === 'game' && game) {
+    update(dt);
+    draw();
+    updateHUD();
+    updateTowerPanel();
+  }
+  requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   启动
+   ========================================================= */
+loadProgress();
+updateSpeedButton();
+updateSoundButton();
+renderLevelGrid();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
